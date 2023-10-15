@@ -5,6 +5,7 @@ import json
 import uuid
 import logging as logger
 from fastapi import FastAPI, Request
+from fastapi.responses import StreamingResponse
 from prompt.template import PromptTemplate
 from prompt.store import TemplateStore
 import uvicorn
@@ -15,7 +16,11 @@ output_tags = ["<output>", "</output>"]
 ROLES = ["Human", "Assistant"]
 CONVERSATIONS = {}
 
-def send_req_to_agent(text, model_family, model_name):
+def send_req_to_agent(text, model_family, model_name, stream=False):
+    def iter_func(result):
+        for chunk in result.iter_lines():
+            yield json.loads(chunk)["generated_text"]
+    
     data = {
         "body": {
             "prompt": text
@@ -24,10 +29,14 @@ def send_req_to_agent(text, model_family, model_name):
         "model_name": model_name
     }
     ret = requests.post(
-        url=api_layer_url, 
-        data=json.dumps(data)
+        url=api_layer_url + ("" if not stream else "_stream"), 
+        data=json.dumps(data),
+        stream=stream
     )
-    return json.loads(ret.text)["generated_text"]
+    if stream:
+        return iter_func(ret)
+    else:
+        return json.loads(ret.text)["generated_text"]
 
 def send_script_to_exc(script, kernel_name):
     data = {
@@ -87,30 +96,49 @@ class Conversation:
         self.history += "\n" + self.roles[role] + ":" + text
         CONVERSATIONS[self.id]["history"] = self.history
         
-    def send_to_agent(self):
+    def send_to_agent(self, stream):
+        def form_response(text=None):
+            CONVERSATIONS[self.id]["history"] = self.history
+            CONVERSATIONS[self.id]["last_agent_message"] = self.last_agent_message
+            script = self.script_extractor(
+                self.last_agent_message,
+                LANGUAGES[self.language]["tag_name"]
+            )
+
+            if script:
+                ret["script"], ret["expected_output"] = script
+            else:
+                ret["script"], ret["expected_output"] = ("", "")
+            ret["generated_text"] = self.last_agent_message
+            if text:
+                ret["text"] = text
+            ret["conv_id"] = self.id
+            return ret
+            
+        
+        def iter_func(results):
+            for result in results:
+                self.history += result
+                self.last_agent_message += result
+                ret = form_response(result)
+                yield json.dumps(ret) + "\n"
+        
         self.append_chat("", 1)
         res = self.agent(
             self.history,
             self.model_family,
-            self.model_name
+            self.model_name,
+            stream
         )
-        self.history += res
-        CONVERSATIONS[self.id]["history"] = self.history
-        self.last_agent_message = res
-        CONVERSATIONS[self.id]["last_agent_message"] = self.last_agent_message
-        
-        result = self.script_extractor(
-            self.last_agent_message,
-            LANGUAGES[self.language]["tag_name"]
-        )
-        ret ={}
-        if result:
-            ret["script"], ret["expected_output"] = result
+        ret = {}
+        if stream:
+            self.last_agent_message = ""
+            return iter_func(res)
         else:
-            ret["script"], ret["expected_output"] = ("", "")
-        ret["generated_text"] = self.last_agent_message
-        ret["conv_id"] = self.id
-        return ret
+            self.history += res
+            self.last_agent_message = res
+            ret = form_response()
+            return ret
     
     def exec_script(self, script, expected_output):
         output_res = ""
@@ -140,59 +168,6 @@ def ping():
 def list_languages():
     return json.dumps(LANGUAGES)
 
-
-#     params = {
-#         "display_name": LANGUAGES[language]["display_name"],
-#         "tag_name": LANGUAGES[language]["tag_name"],
-#         "error_message": "",
-#         "script_output": "",
-#         "language_instructions": LANGUAGES[language]["language_instructions"]
-#     }
-
-#     for test in test_prompts:
-#         conv = Conversation(
-#             ROLES, 
-#             prompt_store.get_prompt_from_template(
-#                 "CI_SYSTEM_PROMPT",
-#                 params
-#             ),
-#             send_req_to_agent,
-#             send_script_to_exc,
-#             extract_script,
-#             language
-#         )
-#         conv.append_chat(
-#             prompt_store.get_prompt_from_template(
-#                 "CI_AGENT_REPLY",
-#                 params
-#             ),
-#             1
-#         )
-#         conv.append_chat(test)
-#         res = conv.send_to_agent_and_exec_script()
-#         max_iterations = 3
-#         i = 0
-#         while i < max_iterations and res["error"]:
-#             i += 1
-#             params["error_message"] = res["output"]
-#             conv.append_chat(
-#                 prompt_store.get_prompt_from_template(
-#                     "CI_SCRIPT_ERROR",
-#                     params
-#                 )
-#             )
-#             conv.send_to_agent_and_exec_script()   
-#         if not res["error"]:
-#             params["script_output"] = res["output"]
-#             conv.append_chat(
-#                 prompt_store.get_prompt_from_template(
-#                     "CI_SCRIPT_SUCCESS",
-#                     params
-#                 )
-#             )
-#             conv.send_to_agent()
-#         print(conv.history)
-
 @app.post("/generate")
 async def generate(request: Request):
     params = await request.json()
@@ -203,6 +178,7 @@ async def generate(request: Request):
     if not (prompt and model_family and model_name and language):
         raise
     conv_id = params.get("conv_id", "")
+    stream = params.get("stream", False)
     
     params = {
         "display_name": LANGUAGES[language]["display_name"],
@@ -234,16 +210,33 @@ async def generate(request: Request):
     )
     conv.append_chat(prompt)
     try:
-        res = conv.send_to_agent()
+        res = conv.send_to_agent(stream)
         if not res:
             raise
-        return res
+        if stream:
+            return StreamingResponse(
+                res, 
+                media_type="application/x-ndjson"
+            )
+        else:
+            return res
     except Exception as e:
         # Handle any exceptions that occur during execution
         return f"An error occurred: {str(e)}"
 
 @app.post("/execute")
 async def execute(request: Request):
+    
+    def iter_func(exec_result, results=None):
+        if results:
+            for json_result in results:
+                result = json.loads(json_result)
+                result["error"] = exec_result["error"]
+                result["output"] = exec_result["output"]
+                yield json.dumps(result) + "\n"
+        else:
+            yield json.dumps(exec_result) + "\n"
+            
     params = await request.json()
     script = params.get("script")
     expected_output = params.get("expected_output", "")
@@ -253,6 +246,7 @@ async def execute(request: Request):
     conv_id = params.get("conv_id")
     if not (script and conv_id and model_family and model_name and language):
         raise
+    stream = params.get("stream", False)
     
     params = {
         "display_name": LANGUAGES[language]["display_name"],
@@ -285,10 +279,18 @@ async def execute(request: Request):
                     params
                 )
             )
-            ret = conv.send_to_agent()
-            ret["output"] = res["output"]
-            ret["error"] = res["error"]
-            return ret
+            ret = conv.send_to_agent(stream)
+            if stream:
+                print(ret)
+                print(res)
+                return StreamingResponse(
+                    iter_func(res, ret),
+                    media_type="application/x-ndjson"
+                )
+            else:
+                ret["output"] = res["output"]
+                ret["error"] = res["error"]
+                return ret
         else:
             # params["script_output"] = res["output"]
             # conv.append_chat(
@@ -298,7 +300,13 @@ async def execute(request: Request):
             #     )
             # )
             # ret = conv.send_to_agent()
-            return res
+            if stream:
+                return StreamingResponse(
+                    iter_func(res),
+                    media_type="application/x-ndjson"
+                )
+            else:
+                return res
     except Exception as e:
         # Handle any exceptions that occur during execution
         return f"An error occurred: {str(e)}"
