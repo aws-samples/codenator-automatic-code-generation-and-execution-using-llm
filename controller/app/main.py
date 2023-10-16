@@ -52,10 +52,10 @@ def send_script_to_exc(script, kernel_name):
 def extract_script(text, tag_name):
     try:
         if code_block_symbol + tag_name in text:
-            script = text.split(code_block_symbol + tag_name + "\n")[1].split( "\n" + code_block_symbol)[0]
+            script = text.split(code_block_symbol + tag_name)[1].split("\n" + code_block_symbol)[0].lstrip("\n")
             expected_output = ""
             if output_tags[0] in text and output_tags[1] in text:
-                expected_output = text.split(output_tags[0] + "\n")[1].split("\n" + output_tags[1])[0]
+                expected_output = text.split(output_tags[0])[1].split("\n" + output_tags[1])[0].lstrip("\n")
             return (script, expected_output)
     except:
         return None
@@ -311,6 +311,7 @@ async def execute(request: Request):
         # Handle any exceptions that occur during execution
         return f"An error occurred: {str(e)}"
 
+    
 if __name__ == "__main__":  
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", type=str, default="localhost")
