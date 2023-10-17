@@ -23,7 +23,8 @@ def send_req_to_agent(text, model_family, model_name, stream=False):
     
     data = {
         "body": {
-            "prompt": text
+            "prompt": text,
+            "stream": stream
         }, 
         "model_family": model_family, 
         "model_name": model_name
