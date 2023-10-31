@@ -1,0 +1,16 @@
+{
+    "Llama2": {
+        "ROLES": ["<s>[INST]", "[/INST]"],
+        "SYSTEM_PROMPT": "LLAMA2_CG_SYSTEM_PROMPT",
+        "CODE_BLOCK_SYMS": ["```{language}", "```"],
+        "OUTPUT_TAGS": ["<output>", "</output>"],
+        "EOS": "</s>"
+    },
+    "Claude": {
+        "ROLES": ["Human:", "Assistant:"],
+        "SYSTEM_PROMPT": "CLAUDE_CG_SYSTEM_PROMPT",
+        "CODE_BLOCK_SYMS": ["```{language}", "```"],
+        "OUTPUT_TAGS": ["<output>", "</output>"],
+        "EOS": "<EOS_TOKEN>"
+    }
+}

@@ -78,6 +78,7 @@ class model(BaseModel):
     
     def invoke_with_response_stream(self, body):
         try:
+            body["stream"] = True
             request_body = self.form_request(
                 body, 
                 self.request_defaults, 
@@ -88,7 +89,6 @@ class model(BaseModel):
                 Body = json.dumps(request_body).encode("utf-8"),
                 ContentType="application/json"
             )
-            text = ""
             for line in self.stream_iter(response["Body"]):
                 if line:
                     output = self.parse_response(
@@ -96,7 +96,7 @@ class model(BaseModel):
                         self.response_stream_mapping,
                         regex_sub=self.response_stream_regex
                     )
-                yield output
+                    yield output
         except Exception as e:
             logger.error(f"Error {e}, Body {body}")
-            raise e
+            yield {"error": f"Error {e}, Body {body}"}

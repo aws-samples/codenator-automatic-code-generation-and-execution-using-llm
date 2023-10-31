@@ -7,7 +7,7 @@
                 "decoder_input_details": false,
                 "details": true,
                 "do_sample": false,
-                "max_new_tokens": 20,
+                "max_new_tokens": 1024,
                 "repetition_penalty": null,
                 "return_full_text": false,
                 "seed": null,

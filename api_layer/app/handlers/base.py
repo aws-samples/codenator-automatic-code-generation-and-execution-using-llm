@@ -1,6 +1,10 @@
 import json
 from jsonpath_ng import jsonpath, parse
 import re
+import boto3
+
+table_name = ""
+ddb_client = boto3.client("dynamodb")
 
 class BaseModel:
     def inovke_api(self):
@@ -8,8 +12,20 @@ class BaseModel:
     
     def load_mappings(self, schema_path):
         mappings = {}
-        with open(schema_path, "r") as schema_file:
-            mappings = json.load(schema_file)
+        if table_name == "":
+            with open(schema_path, "r") as schema_file:
+                mappings = json.load(schema_file)
+        else:
+            schema = ddb_client.get_item(
+            TableName=table_name,
+            Key={
+                    "model_id": {
+                        "S": schema_path
+                    }
+                }
+            )["Item"]["schema"]["S"]
+            mappings = json.loads(schema)
+            
         return (
             mappings["request"]["defaults"],
             mappings["request"]["mapping"],

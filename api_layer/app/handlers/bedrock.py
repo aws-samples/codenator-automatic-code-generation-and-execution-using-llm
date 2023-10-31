@@ -80,6 +80,7 @@ class model(BaseModel):
             
     def invoke_with_response_stream(self, body):
         try:
+            body["stream"] = True
             request_body = self.form_request(
                 body, 
                 self.request_defaults, 
@@ -89,7 +90,6 @@ class model(BaseModel):
                 modelId=self.model_name,
                 body = json.dumps(request_body).encode("utf-8")
             )
-            text = ""
             for line in self.stream_iter(response["body"]):
                 if line:
                     output = self.parse_response(

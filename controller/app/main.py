@@ -65,7 +65,7 @@ def extract_script(text, tag_name):
 class Conversation:
     def __init__(
         self, 
-        roles, 
+        # roles, 
         prompt, 
         agent, 
         executor,
@@ -76,7 +76,7 @@ class Conversation:
         conv_id: str=""
     ):
         self.id = conv_id if conv_id != "" and conv_id in CONVERSATIONS else uuid.uuid4().hex[:16]
-        self.roles = roles
+        # self.roles = roles
         self.system_prompt = prompt
         if conv_id == "":
             self.history = ""
@@ -94,7 +94,7 @@ class Conversation:
         self.model_name = model_name
         
     def append_chat(self, text, role=0):
-        self.history += "\n" + self.roles[role] + ":" + text
+        self.history += "\n" + self.roles[role] + text
         CONVERSATIONS[self.id]["history"] = self.history
         
     def send_to_agent(self, stream):
@@ -202,13 +202,13 @@ async def generate(request: Request):
         model_name,
         conv_id
     )
-    conv.append_chat(
-        prompt_store.get_prompt_from_template(
-            "CI_AGENT_REPLY",
-            params
-        ),
-        1
-    )
+    # conv.append_chat(
+    #     prompt_store.get_prompt_from_template(
+    #         "CI_AGENT_REPLY",
+    #         params
+    #     ),
+    #     1
+    # )
     conv.append_chat(prompt)
     try:
         res = conv.send_to_agent(stream)
@@ -223,7 +223,7 @@ async def generate(request: Request):
             return res
     except Exception as e:
         # Handle any exceptions that occur during execution
-        return f"An error occurred: {str(e)}"
+        return {"error": f"An error occurred: {str(e)}"}
 
 @app.post("/execute")
 async def execute(request: Request):
@@ -293,14 +293,6 @@ async def execute(request: Request):
                 ret["error"] = res["error"]
                 return ret
         else:
-            # params["script_output"] = res["output"]
-            # conv.append_chat(
-            #     prompt_store.get_prompt_from_template(
-            #         "CI_SCRIPT_SUCCESS",
-            #         params
-            #     )
-            # )
-            # ret = conv.send_to_agent()
             if stream:
                 return StreamingResponse(
                     iter_func(res),
@@ -310,7 +302,7 @@ async def execute(request: Request):
                 return res
     except Exception as e:
         # Handle any exceptions that occur during execution
-        return f"An error occurred: {str(e)}"
+        return {"error": f"An error occurred: {str(e)}"}
 
     
 if __name__ == "__main__":  
