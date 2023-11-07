@@ -20,11 +20,14 @@ class BaseModel:
             schema = ddb_client.get_item(
                 TableName=table_name,
                 Key={
-                        "model_id": {
-                            "S": schema_path
-                        }
+                    "pk": {
+                        "S": "models"
+                    },
+                    "sk": {
+                        "S": schema_path
                     }
-                )["Item"]["schema"]["S"]
+                }
+            )["Item"]["schema"]["S"]
             mappings = json.loads(schema)
 
         return (

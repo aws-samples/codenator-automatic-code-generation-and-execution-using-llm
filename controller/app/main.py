@@ -9,17 +9,67 @@ from fastapi.responses import StreamingResponse
 from prompt.template import PromptTemplate
 from prompt.store import TemplateStore
 import uvicorn
+import boto3
 
 app = FastAPI()
-code_block_symbol = "```"
-output_tags = ["<output>", "</output>"]
-ROLES = ["Human", "Assistant"]
 CONVERSATIONS = {}
 
-def send_req_to_agent(text, model_family, model_name, stream=False):
-    def iter_func(result):
+def get_models_list():
+    ret = requests.get(url=api_layer_url.split("/invoke")[0] + "/list_models")
+    return json.loads(ret.text)["models"]
+
+def get_model_type(model_family, model_name):
+    models = get_models_list()
+    model_type = ""
+    can_stream = False
+    for model in models:
+        if model["model_family"] == model_family and model["model_name"] == model_name:
+            model_type = model["model_type"]
+            can_stream = model["streaming"]
+    return model_type, can_stream
+
+def get_model_metadata(model_type):
+    if models_metadata_db != "":
+        ddb_client = boto3.client("dynamodb")
+        ret = ddb_client.get_item(
+            TableName=models_metadata_db,
+            Key={
+                "pk": {
+                    "S": "model_types"
+                },
+                "sk": {
+                    "S": model_type
+                }
+            }
+        )["Item"]["metadata"]["S"]
+        return json.loads(ret)
+    else:
+        return models_metadata[model_type]
+
+def get_languages():
+    if models_metadata_db != "":
+        ddb_client = boto3.client("dynamodb")
+        ret = ddb_client.get_item(
+            TableName=models_metadata_db,
+            Key={
+                "pk": {
+                    "S": "languages"
+                },
+                "sk": {
+                    "S": "languages"
+                }
+            }
+        )["Item"]["data"]["S"]
+        return json.loads(ret)
+    else:
+        return LANGUAGES
+
+def send_req_to_agent(text, model_family, model_name, model_metadata, stream=False):
+    def iter_func(result, model_metadata):
         for chunk in result.iter_lines():
-            yield json.loads(chunk)["generated_text"]
+            res = json.loads(chunk)
+            if "generated_text"  in res and res["generated_text"] != model_metadata["EOS"]:
+                yield res["generated_text"]
     
     data = {
         "body": {
@@ -35,7 +85,7 @@ def send_req_to_agent(text, model_family, model_name, stream=False):
         stream=stream
     )
     if stream:
-        return iter_func(ret)
+        return iter_func(ret, model_metadata)
     else:
         return json.loads(ret.text)["generated_text"]
 
@@ -50,13 +100,33 @@ def send_script_to_exc(script, kernel_name):
     )
     return json.loads(ret.text)
 
-def extract_script(text, tag_name):
+def extract_script(text, model_metadata, tag_name):
     try:
-        if code_block_symbol + tag_name in text:
-            script = text.split(code_block_symbol + tag_name)[1].split("\n" + code_block_symbol)[0].lstrip("\n")
+        if model_metadata["CODE_BLOCK_SYMS"][0].format(
+            **{
+                "language": tag_name
+            }
+        ) in text:
+            script = text.split(
+                model_metadata["CODE_BLOCK_SYMS"][0].format(
+                    **{
+                        "language": tag_name
+                    }
+                )
+            )[1].split(
+                "\n" + model_metadata["CODE_BLOCK_SYMS"][1].format(
+                    **{
+                        "language": tag_name
+                    }
+                )
+            )[0].lstrip("\n")
             expected_output = ""
-            if output_tags[0] in text and output_tags[1] in text:
-                expected_output = text.split(output_tags[0])[1].split("\n" + output_tags[1])[0].lstrip("\n")
+            if model_metadata["OUTPUT_TAGS"][0] in text and model_metadata["OUTPUT_TAGS"][1] in text:
+                expected_output = text.split(
+                    model_metadata["OUTPUT_TAGS"][0]
+                )[1].split(
+                    "\n" + model_metadata["OUTPUT_TAGS"][1]
+                )[0].lstrip("\n")
             return (script, expected_output)
     except:
         return None
@@ -65,7 +135,7 @@ def extract_script(text, tag_name):
 class Conversation:
     def __init__(
         self, 
-        # roles, 
+        roles, 
         prompt, 
         agent, 
         executor,
@@ -73,10 +143,11 @@ class Conversation:
         language,
         model_family,
         model_name,
+        model_metadata,
         conv_id: str=""
     ):
         self.id = conv_id if conv_id != "" and conv_id in CONVERSATIONS else uuid.uuid4().hex[:16]
-        # self.roles = roles
+        self.roles = roles
         self.system_prompt = prompt
         if conv_id == "":
             self.history = ""
@@ -92,6 +163,7 @@ class Conversation:
         self.language = language
         self.model_family = model_family
         self.model_name = model_name
+        self.model_metadata = model_metadata
         
     def append_chat(self, text, role=0):
         self.history += "\n" + self.roles[role] + text
@@ -103,6 +175,7 @@ class Conversation:
             CONVERSATIONS[self.id]["last_agent_message"] = self.last_agent_message
             script = self.script_extractor(
                 self.last_agent_message,
+                self.model_metadata,
                 LANGUAGES[self.language]["tag_name"]
             )
 
@@ -129,6 +202,7 @@ class Conversation:
             self.history,
             self.model_family,
             self.model_name,
+            self.model_metadata,
             stream
         )
         ret = {}
@@ -167,6 +241,7 @@ def ping():
 
 @app.get("/list_languages")
 def list_languages():
+    LANGUAGES = get_languages()
     return json.dumps(LANGUAGES)
 
 @app.post("/generate")
@@ -178,9 +253,14 @@ async def generate(request: Request):
     language = params.get("language")
     if not (prompt and model_family and model_name and language):
         raise
+    model_type, can_stream = get_model_type(model_family, model_name)
+    if model_type == "":
+        return {"error": "Unknown model"}
     conv_id = params.get("conv_id", "")
     stream = params.get("stream", False)
-    
+    if stream:
+        stream = can_stream
+    LANGUAGES = get_languages()
     params = {
         "display_name": LANGUAGES[language]["display_name"],
         "tag_name": LANGUAGES[language]["tag_name"],
@@ -188,10 +268,13 @@ async def generate(request: Request):
         "script_output": "",
         "language_instructions": LANGUAGES[language]["language_instructions"]
     }
+    
+    model_metadata = get_model_metadata(model_type)
+    
     conv = Conversation(
-        ROLES, 
+        model_metadata["ROLES"], 
         prompt_store.get_prompt_from_template(
-            "CI_SYSTEM_PROMPT",
+            model_metadata["SYSTEM_PROMPT_TMPLT"],
             params
         ),
         send_req_to_agent,
@@ -200,15 +283,16 @@ async def generate(request: Request):
         language,
         model_family,
         model_name,
+        model_metadata,
         conv_id
     )
-    # conv.append_chat(
-    #     prompt_store.get_prompt_from_template(
-    #         "CI_AGENT_REPLY",
-    #         params
-    #     ),
-    #     1
-    # )
+    conv.append_chat(
+        prompt_store.get_prompt_from_template(
+            model_metadata["AGENT_REPLY_TMPLT"],
+            params
+        ),
+        1
+    )
     conv.append_chat(prompt)
     try:
         res = conv.send_to_agent(stream)
@@ -248,7 +332,7 @@ async def execute(request: Request):
     if not (script and conv_id and model_family and model_name and language):
         raise
     stream = params.get("stream", False)
-    
+    LANGUAGES = get_languages()
     params = {
         "display_name": LANGUAGES[language]["display_name"],
         "tag_name": LANGUAGES[language]["tag_name"],
@@ -256,10 +340,12 @@ async def execute(request: Request):
         "script_output": "",
         "language_instructions": LANGUAGES[language]["language_instructions"]
     }
+    
+    model_metadata = get_model_metadata(model_type)
     conv = Conversation(
-        ROLES, 
+        model_metadata["ROLES"], 
         prompt_store.get_prompt_from_template(
-            "CI_SYSTEM_PROMPT",
+            model_metadata["SYSTEM_PROMPT_TMPLT"],
             params
         ),
         send_req_to_agent,
@@ -268,6 +354,7 @@ async def execute(request: Request):
         language,
         model_family,
         model_name,
+        model_metadata,
         conv_id
     )
     try:
@@ -276,14 +363,12 @@ async def execute(request: Request):
             params["error_message"] = res["output"]
             conv.append_chat(
                 prompt_store.get_prompt_from_template(
-                    "CI_SCRIPT_ERROR",
+                    model_metadata["SCRIPT_ERROR_TMPLT"],
                     params
                 )
             )
             ret = conv.send_to_agent(stream)
             if stream:
-                print(ret)
-                print(res)
                 return StreamingResponse(
                     iter_func(res, ret),
                     media_type="application/x-ndjson"
@@ -314,6 +399,9 @@ if __name__ == "__main__":
     parser.add_argument("--code-executor-host", type=str, default="localhost")
     parser.add_argument("--code-executor-port", type=int, default=8080)
     parser.add_argument("--prompt-database-file", type=str, default="prompt/database.json")
+    parser.add_argument("--prompt-store-name", type=str, default="")
+    parser.add_argument("--models-metadata-db", type=str, default="")
+    parser.add_argument("--models-metadata-file", type=str, default="config/model_meta.json")
     parser.add_argument("--languages-file", type=str, default="config/languages.json")
     parser.add_argument("--max-exec-iter", type=int, default=3)
     args = parser.parse_args()
@@ -321,10 +409,23 @@ if __name__ == "__main__":
     max_iterations = args.max_exec_iter
     api_layer_url = f"http://{args.api_layer_host}:{args.api_layer_port}/invoke"
     code_executor_url = f"http://{args.code_executor_host}:{args.code_executor_port}/execute_code"
-    prompt_store = TemplateStore()
-    prompt_store.read_from_json(args.prompt_database_file)
-    with open(args.languages_file, "r") as json_f:
-        LANGUAGES = json.load(json_f)    
+    models_metadata = {}
+    models_metadata_db = ""
+    LANGUAGES = {}
+    prompt_store = TemplateStore(
+        external_store=True if args.prompt_store_name != "" else False, 
+        ddb_table_name=args.prompt_store_name
+    )
+    if args.prompt_store_name == "":
+        prompt_store.read_from_json(args.prompt_database_file)
+    if args.models_metadata_db == "":
+        with open(args.models_metadata_file, "r") as json_f:
+            models_metadata = json.load(json_f)
+        with open(args.languages_file, "r") as json_f:
+            LANGUAGES = json.load(json_f)
+    else:
+        models_metadata_db = args.models_metadata_db
+        LANGUAGES = get_languages()
     
     uvicorn.run(
         app, 

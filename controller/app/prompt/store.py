@@ -1,4 +1,5 @@
 import json
+import boto3
 from typing import List, Dict
 from prompt.template import PromptTemplate
 
@@ -11,6 +12,7 @@ class TemplateStore:
                 raise ValueError("Must supply valid ddb_table_name for external store")
             else:
                 self.table_name = ddb_table_name
+                self.ddb_client = boto3.client("dynamodb")
         
     def add_template(self, template_id: str, template: PromptTemplate):
         self.database[template_id] = template
@@ -21,8 +23,18 @@ class TemplateStore:
     def get_prompt_from_template(self, template_id: str, param_values: Dict[str, str]):
         if self.external_store:
             if template_id not in self.database:
-                # TODO: Get template from DDB
-                raise NotImplementedError("DDB store not implemented yet")
+                item = self.ddb_client.get_item(
+                    TableName=self.table_name, 
+                    Key={
+                        "template_id":{
+                            "S": template_id
+                        }
+                    }
+                )["Item"]
+                record = PromptTemplate(item["template"]["S"], json.loads(item["params"]["S"]))
+                self.add_template(template_id=item["template_id"]["S"], template=record)
+            else:
+                record = self.database[template_id]
         else:
             record = self.database[template_id]
         kwargs = {}

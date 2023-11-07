@@ -28,7 +28,10 @@ def list_models():
         all_models = base.ddb_client.get_item(
             TableName=base.table_name,
             Key={
-                "model_id": {
+                "pk": {
+                    "S": "models"
+                },
+                "sk": {
                     "S": "all-models"
                 }
             }

@@ -1,14 +1,20 @@
 {
     "Llama2": {
         "ROLES": ["<s>[INST]", "[/INST]"],
-        "SYSTEM_PROMPT": "LLAMA2_CG_SYSTEM_PROMPT",
+        "CG_SYSTEM_PROMPT_TMPLT": "LLAMA2_CG_SYSTEM_PROMPT",
+        "SCRIPT_SUCCESS_TMPLT": "CG_SCRIPT_SUCCESS",
+        "SCRIPT_ERROR_TMPLT": "CG_SCRIPT_ERROR",
+        "AGENT_REPLY_TMPLT": "CG_AGENT_REPLY",
         "CODE_BLOCK_SYMS": ["```{language}", "```"],
         "OUTPUT_TAGS": ["<output>", "</output>"],
         "EOS": "</s>"
     },
     "Claude": {
         "ROLES": ["Human:", "Assistant:"],
-        "SYSTEM_PROMPT": "CLAUDE_CG_SYSTEM_PROMPT",
+        "CI_SYSTEM_PROMPT": "CLAUDE_CG_SYSTEM_PROMPT",
+        "SCRIPT_SUCCESS_TMPLT": "CG_SCRIPT_SUCCESS",
+        "SCRIPT_ERROR_TMPLT": "CG_SCRIPT_ERROR",
+        "AGENT_REPLY_TMPLT": "CG_AGENT_REPLY",
         "CODE_BLOCK_SYMS": ["```{language}", "```"],
         "OUTPUT_TAGS": ["<output>", "</output>"],
         "EOS": "<EOS_TOKEN>"
