@@ -1,238 +1,23 @@
-from importlib import import_module
 import argparse
 import requests
 import json
-import uuid
 import logging as logger
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
-from prompt.template import PromptTemplate
-from prompt.store import TemplateStore
 import uvicorn
-import boto3
+from prompt.store import TemplateStore
+from conversation import Conversation
+import utils
+from utils import (
+    get_model_type,
+    get_model_metadata,
+    get_languages,
+    send_req_to_agent,
+    send_script_to_exc,
+    extract_script
+)
 
 app = FastAPI()
-CONVERSATIONS = {}
-
-def get_models_list():
-    ret = requests.get(url=api_layer_url.split("/invoke")[0] + "/list_models")
-    return json.loads(ret.text)["models"]
-
-def get_model_type(model_family, model_name):
-    models = get_models_list()
-    model_type = ""
-    can_stream = False
-    for model in models:
-        if model["model_family"] == model_family and model["model_name"] == model_name:
-            model_type = model["model_type"]
-            can_stream = model["streaming"]
-    return model_type, can_stream
-
-def get_model_metadata(model_type):
-    if models_metadata_db != "":
-        ddb_client = boto3.client("dynamodb")
-        ret = ddb_client.get_item(
-            TableName=models_metadata_db,
-            Key={
-                "pk": {
-                    "S": "model_types"
-                },
-                "sk": {
-                    "S": model_type
-                }
-            }
-        )["Item"]["metadata"]["S"]
-        return json.loads(ret)
-    else:
-        return models_metadata[model_type]
-
-def get_languages():
-    if models_metadata_db != "":
-        ddb_client = boto3.client("dynamodb")
-        ret = ddb_client.get_item(
-            TableName=models_metadata_db,
-            Key={
-                "pk": {
-                    "S": "languages"
-                },
-                "sk": {
-                    "S": "languages"
-                }
-            }
-        )["Item"]["data"]["S"]
-        return json.loads(ret)
-    else:
-        return LANGUAGES
-
-def send_req_to_agent(text, model_family, model_name, model_metadata, stream=False):
-    def iter_func(result, model_metadata):
-        for chunk in result.iter_lines():
-            res = json.loads(chunk)
-            if "generated_text"  in res and res["generated_text"] != model_metadata["EOS"]:
-                yield res["generated_text"]
-    
-    data = {
-        "body": {
-            "prompt": text,
-            "stream": stream
-        }, 
-        "model_family": model_family, 
-        "model_name": model_name
-    }
-    ret = requests.post(
-        url=api_layer_url + ("" if not stream else "_stream"), 
-        data=json.dumps(data),
-        stream=stream
-    )
-    if stream:
-        return iter_func(ret, model_metadata)
-    else:
-        return json.loads(ret.text)["generated_text"]
-
-def send_script_to_exc(script, kernel_name):
-    data = {
-        "code": script, 
-        "kernel_name": kernel_name
-    }
-    ret = requests.post(
-        url=code_executor_url, 
-        data=json.dumps(data)
-    )
-    return json.loads(ret.text)
-
-def extract_script(text, model_metadata, tag_name):
-    try:
-        if model_metadata["CODE_BLOCK_SYMS"][0].format(
-            **{
-                "language": tag_name
-            }
-        ) in text:
-            script = text.split(
-                model_metadata["CODE_BLOCK_SYMS"][0].format(
-                    **{
-                        "language": tag_name
-                    }
-                )
-            )[1].split(
-                "\n" + model_metadata["CODE_BLOCK_SYMS"][1].format(
-                    **{
-                        "language": tag_name
-                    }
-                )
-            )[0].lstrip("\n")
-            expected_output = ""
-            if model_metadata["OUTPUT_TAGS"][0] in text and model_metadata["OUTPUT_TAGS"][1] in text:
-                expected_output = text.split(
-                    model_metadata["OUTPUT_TAGS"][0]
-                )[1].split(
-                    "\n" + model_metadata["OUTPUT_TAGS"][1]
-                )[0].lstrip("\n")
-            return (script, expected_output)
-    except:
-        return None
-    return None
-
-class Conversation:
-    def __init__(
-        self, 
-        roles, 
-        prompt, 
-        agent, 
-        executor,
-        script_extractor,
-        language,
-        model_family,
-        model_name,
-        model_metadata,
-        conv_id: str=""
-    ):
-        self.id = conv_id if conv_id != "" and conv_id in CONVERSATIONS else uuid.uuid4().hex[:16]
-        self.roles = roles
-        self.system_prompt = prompt
-        if conv_id == "":
-            self.history = ""
-            self.last_agent_message = ""
-            CONVERSATIONS[self.id] = {}
-            self.append_chat(prompt, 0)
-        else:
-            self.history = CONVERSATIONS[self.id]["history"]
-            self.last_agent_message = CONVERSATIONS[self.id]["last_agent_message"]
-        self.agent = agent
-        self.executor = executor
-        self.script_extractor = script_extractor
-        self.language = language
-        self.model_family = model_family
-        self.model_name = model_name
-        self.model_metadata = model_metadata
-        
-    def append_chat(self, text, role=0):
-        self.history += "\n" + self.roles[role] + text
-        CONVERSATIONS[self.id]["history"] = self.history
-        
-    def send_to_agent(self, stream):
-        def form_response(text=None):
-            CONVERSATIONS[self.id]["history"] = self.history
-            CONVERSATIONS[self.id]["last_agent_message"] = self.last_agent_message
-            script = self.script_extractor(
-                self.last_agent_message,
-                self.model_metadata,
-                LANGUAGES[self.language]["tag_name"]
-            )
-
-            if script:
-                ret["script"], ret["expected_output"] = script
-            else:
-                ret["script"], ret["expected_output"] = ("", "")
-            ret["generated_text"] = self.last_agent_message
-            if text:
-                ret["text"] = text
-            ret["conv_id"] = self.id
-            return ret
-            
-        
-        def iter_func(results):
-            for result in results:
-                self.history += result
-                self.last_agent_message += result
-                ret = form_response(result)
-                yield json.dumps(ret) + "\n"
-        
-        self.append_chat("", 1)
-        res = self.agent(
-            self.history,
-            self.model_family,
-            self.model_name,
-            self.model_metadata,
-            stream
-        )
-        ret = {}
-        if stream:
-            self.last_agent_message = ""
-            return iter_func(res)
-        else:
-            self.history += res
-            self.last_agent_message = res
-            ret = form_response()
-            return ret
-    
-    def exec_script(self, script, expected_output):
-        output_res = ""
-        if LANGUAGES[self.language]["pre_exec_script"]:
-            output_res += self.executor(
-                LANGUAGES[self.language]["pre_exec_script"], 
-                LANGUAGES[self.language]["kernel_name"]
-            )["output"]
-        res = self.executor(script, LANGUAGES[self.language]["kernel_name"])
-        res["output"] = output_res + res["output"]
-        if LANGUAGES[self.language]["post_exec_script"]:
-            res["output"] += self.executor(
-                LANGUAGES[self.language]["post_exec_script"], 
-                LANGUAGES[self.language]["kernel_name"]
-            )["output"]
-        res["script"] = script
-        res["expected_output"] = expected_output
-        res["conv_id"] = self.id
-        return res
 
 # health check
 @app.get("/ping")
@@ -241,8 +26,8 @@ def ping():
 
 @app.get("/list_languages")
 def list_languages():
-    LANGUAGES = get_languages()
-    return json.dumps(LANGUAGES)
+    utils.LANGUAGES = get_languages()
+    return json.dumps(utils.LANGUAGES)
 
 @app.post("/generate")
 async def generate(request: Request):
@@ -260,13 +45,13 @@ async def generate(request: Request):
     stream = params.get("stream", False)
     if stream:
         stream = can_stream
-    LANGUAGES = get_languages()
+    utils.LANGUAGES = get_languages()
     params = {
-        "display_name": LANGUAGES[language]["display_name"],
-        "tag_name": LANGUAGES[language]["tag_name"],
+        "display_name": utils.LANGUAGES[language]["display_name"],
+        "tag_name": utils.LANGUAGES[language]["tag_name"],
         "error_message": "",
         "script_output": "",
-        "language_instructions": LANGUAGES[language]["language_instructions"]
+        "language_instructions": utils.LANGUAGES[language]["language_instructions"]
     }
     
     model_metadata = get_model_metadata(model_type)
@@ -331,14 +116,19 @@ async def execute(request: Request):
     conv_id = params.get("conv_id")
     if not (script and conv_id and model_family and model_name and language):
         raise
+    model_type, can_stream = get_model_type(model_family, model_name)
+    if model_type == "":
+        return {"error": "Unknown model"}
     stream = params.get("stream", False)
-    LANGUAGES = get_languages()
+    if stream:
+        stream = can_stream
+    utils.LANGUAGES = get_languages()
     params = {
-        "display_name": LANGUAGES[language]["display_name"],
-        "tag_name": LANGUAGES[language]["tag_name"],
+        "display_name": utils.LANGUAGES[language]["display_name"],
+        "tag_name": utils.LANGUAGES[language]["tag_name"],
         "error_message": "",
         "script_output": "",
-        "language_instructions": LANGUAGES[language]["language_instructions"]
+        "language_instructions": utils.LANGUAGES[language]["language_instructions"]
     }
     
     model_metadata = get_model_metadata(model_type)
@@ -398,6 +188,8 @@ if __name__ == "__main__":
     parser.add_argument("--api-layer-port", type=int, default=8080)
     parser.add_argument("--code-executor-host", type=str, default="localhost")
     parser.add_argument("--code-executor-port", type=int, default=8080)
+    parser.add_argument("--code-scanner-host", type=str, default="localhost")
+    parser.add_argument("--code-scanner-port", type=int, default=8080)
     parser.add_argument("--prompt-database-file", type=str, default="prompt/database.json")
     parser.add_argument("--prompt-store-name", type=str, default="")
     parser.add_argument("--models-metadata-db", type=str, default="")
@@ -407,11 +199,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     logger.info(f"args: {args}")
     max_iterations = args.max_exec_iter
-    api_layer_url = f"http://{args.api_layer_host}:{args.api_layer_port}/invoke"
-    code_executor_url = f"http://{args.code_executor_host}:{args.code_executor_port}/execute_code"
-    models_metadata = {}
-    models_metadata_db = ""
-    LANGUAGES = {}
+    utils.api_layer_url = f"http://{args.api_layer_host}:{args.api_layer_port}/invoke"
+    utils.code_executor_url = f"http://{args.code_executor_host}:{args.code_executor_port}/execute_code"
+    utils.code_scanner_url = f"http://{args.code_scanner_host}:{args.code_scanner_port}/scan"
     prompt_store = TemplateStore(
         external_store=True if args.prompt_store_name != "" else False, 
         ddb_table_name=args.prompt_store_name
@@ -420,12 +210,12 @@ if __name__ == "__main__":
         prompt_store.read_from_json(args.prompt_database_file)
     if args.models_metadata_db == "":
         with open(args.models_metadata_file, "r") as json_f:
-            models_metadata = json.load(json_f)
+            utils.models_metadata = json.load(json_f)
         with open(args.languages_file, "r") as json_f:
-            LANGUAGES = json.load(json_f)
+            utils.LANGUAGES = json.load(json_f)
     else:
-        models_metadata_db = args.models_metadata_db
-        LANGUAGES = get_languages()
+        utils.models_metadata_db = args.models_metadata_db
+        utils.LANGUAGES = get_languages()
     
     uvicorn.run(
         app, 
