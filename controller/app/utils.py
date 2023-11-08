@@ -86,6 +86,18 @@ def send_req_to_agent(text, model_family, model_name, model_metadata, stream=Fal
     else:
         return json.loads(ret.text)["generated_text"]
 
+def security_scan_script(script, language, scanner="semgrep"):
+    data = {
+        "script": script, 
+        "language": language, 
+        "scanner": scanner
+    }
+    ret = requests.post(
+        url=code_scanner_url, 
+        data=json.dumps(data)
+    )
+    return json.loads(ret.text)
+
 def send_script_to_exc(script, kernel_name):
     data = {
         "code": script, 

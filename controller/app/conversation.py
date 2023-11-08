@@ -9,7 +9,8 @@ class Conversation:
         self, 
         roles, 
         prompt, 
-        agent, 
+        agent,
+        scanner,
         executor,
         script_extractor,
         language,
@@ -30,6 +31,7 @@ class Conversation:
             self.history = CONVERSATIONS[self.id]["history"]
             self.last_agent_message = CONVERSATIONS[self.id]["last_agent_message"]
         self.agent = agent
+        self.scanner = scanner
         self.executor = executor
         self.script_extractor = script_extractor
         self.language = language
@@ -86,6 +88,13 @@ class Conversation:
             self.last_agent_message = res
             ret = form_response()
             return ret
+
+    def scan_script(self, script):
+        res = {}
+        res["vulnerabilities"] = self.scanner(script, self.language)
+        res["script"] = script
+        res["conv_id"] = self.id
+        return res
     
     def exec_script(self, script, expected_output):
         output_res = ""

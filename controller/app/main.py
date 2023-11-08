@@ -13,6 +13,7 @@ from utils import (
     get_model_metadata,
     get_languages,
     send_req_to_agent,
+    security_scan_script,
     send_script_to_exc,
     extract_script
 )
@@ -63,6 +64,7 @@ async def generate(request: Request):
             params
         ),
         send_req_to_agent,
+        security_scan_script,
         send_script_to_exc,
         extract_script,
         language,
@@ -90,6 +92,89 @@ async def generate(request: Request):
             )
         else:
             return res
+    except Exception as e:
+        # Handle any exceptions that occur during execution
+        return {"error": f"An error occurred: {str(e)}"}
+
+@app.post("/scan")
+async def scan(request: Request):
+    
+    def iter_func(scan_result, results=None):
+        if results:
+            for json_result in results:
+                result = json.loads(json_result)
+                result["vulnerabilities"] = scan_result
+                yield json.dumps(result) + "\n"
+        else:
+            yield json.dumps(scan_result) + "\n"
+            
+    params = await request.json()
+    script = params.get("script")
+    model_family = params.get("model_family")
+    model_name = params.get("model_name")
+    language = params.get("language")
+    conv_id = params.get("conv_id")
+    if not (script and conv_id and model_family and model_name and language):
+        raise
+    model_type, can_stream = get_model_type(model_family, model_name)
+    if model_type == "":
+        return {"error": "Unknown model"}
+    stream = params.get("stream", False)
+    if stream:
+        stream = can_stream
+    utils.LANGUAGES = get_languages()
+    params = {
+        "display_name": utils.LANGUAGES[language]["display_name"],
+        "tag_name": utils.LANGUAGES[language]["tag_name"],
+        "error_message": "",
+        "script_output": "",
+        "language_instructions": utils.LANGUAGES[language]["language_instructions"]
+    }
+    
+    model_metadata = get_model_metadata(model_type)
+    conv = Conversation(
+        model_metadata["ROLES"], 
+        prompt_store.get_prompt_from_template(
+            model_metadata["SYSTEM_PROMPT_TMPLT"],
+            params
+        ),
+        send_req_to_agent,
+        security_scan_script,
+        send_script_to_exc,
+        extract_script,
+        language,
+        model_family,
+        model_name,
+        model_metadata,
+        conv_id
+    )
+    try:
+        res = conv.scan_script(script)
+        if len(res["vulnerabilities"]) > 0:
+            params["vulnerabilities"] = res["vulnerabilities"]
+            conv.append_chat(
+                prompt_store.get_prompt_from_template(
+                    model_metadata["UNSECURE_SCRIPT_TMPLT"],
+                    params
+                )
+            )
+            ret = conv.send_to_agent(stream)
+            if stream:
+                return StreamingResponse(
+                    iter_func(res, ret),
+                    media_type="application/x-ndjson"
+                )
+            else:
+                ret["vulnerabilities"] = res["vulnerabilities"]
+                return ret
+        else:
+            if stream:
+                return StreamingResponse(
+                    iter_func(res),
+                    media_type="application/x-ndjson"
+                )
+            else:
+                return res
     except Exception as e:
         # Handle any exceptions that occur during execution
         return {"error": f"An error occurred: {str(e)}"}
