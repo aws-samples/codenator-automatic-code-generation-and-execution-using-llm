@@ -15,7 +15,9 @@ from constants import (
     output_info_msg,
     scan_fail_msg,
     scan_pass_msg,
-    scan_empty_msg
+    scan_empty_msg,
+    sec_out_err_msg,
+    sec_out_info_msg
 )
 
 # Global
@@ -29,12 +31,12 @@ class ConvState:
 def scan_fn_with_stream(conv: gr.State, history, code, scan_status, exp_out, model, language, stream):
     output = gr.Textbox(
         value="",
-        label="Output:", 
+        label=sec_out_info_msg, 
         elem_id="--primary-50", 
         interactive=False, 
         show_copy_button=True,
-        lines=15,
-        max_lines=15
+        lines=7,
+        max_lines=7
     )
     if conv.conv_id != "":
         if code != "" and conv.scan_retries < max_security_scan_retries and not conv.passed_security_scan:
@@ -61,10 +63,10 @@ def scan_fn_with_stream(conv: gr.State, history, code, scan_status, exp_out, mod
                     # gr.Warning("Code security scan detected some issues.")
                     output = gr.Textbox(
                         value=json_obj["vulnerabilities"],
-                        label=output_err_msg, 
+                        label=sec_out_err_msg, 
                         elem_id="red",
-                        lines=15,
-                        max_lines=15
+                        lines=7,
+                        max_lines=7
                     )
                     code = json_obj["script"]
                     scan_status = scan_fail_msg
@@ -99,7 +101,7 @@ def scan_fn_with_stream(conv: gr.State, history, code, scan_status, exp_out, mod
                     yield {
                         state: conv,
                         chatbot: history,
-                        out: output
+                        sec_out: output
                     }
                 else:
                     scan_status = scan_pass_msg
@@ -112,7 +114,7 @@ def scan_fn_with_stream(conv: gr.State, history, code, scan_status, exp_out, mod
     ret = {
         chatbot: history, 
         scan_stat: scan_status,
-        out:output
+        sec_out:output
     }
     if not conv.passed_security_scan:
         ret[script] = code
@@ -121,12 +123,12 @@ def scan_fn_with_stream(conv: gr.State, history, code, scan_status, exp_out, mod
 def scan_fn(conv: gr.State, history, code, scan_status, exp_out, model, language, stream):
     output = gr.Textbox(
         value="",
-        label="Output:", 
+        label=sec_out_info_msg, 
         elem_id="--primary-50", 
         interactive=False, 
         show_copy_button=True,
-        lines=15,
-        max_lines=15
+        lines=7,
+        max_lines=7
     )
     if conv.conv_id != "":
         if code != "" and conv.scan_retries < max_security_scan_retries and not conv.passed_security_scan:
@@ -151,17 +153,17 @@ def scan_fn(conv: gr.State, history, code, scan_status, exp_out, model, language
                 conv.scan_retries += 1
                 output = gr.Textbox(
                     value=response["vulnerabilities"],
-                    label=output_err_msg,
+                    label=sec_out_err_msg,
                     elem_id="red",
-                    lines=15,
-                    max_lines=15
+                    lines=7,
+                    max_lines=7
                 )
                 history.append(["Securit scan produced shown recommendations.", response["generated_text"]])
                 code = response["script"]
                 return {
                     state: conv,
                     chatbot: history,
-                    out: output, 
+                    sec_out: output, 
                     scan_stat: scan_fail_msg
                 }
             else:
@@ -170,7 +172,7 @@ def scan_fn(conv: gr.State, history, code, scan_status, exp_out, model, language
                 return {
                     state: conv,
                     scan_stat: scan_pass_msg,
-                    out: output
+                    sec_out: output
                 }
     else:
         return {}
@@ -306,8 +308,8 @@ def execute_fn_with_stream(conv: gr.State, history, code, exp_out, model, langua
     history[-1][1] = history[-1][1][:-1]
     yield history, output, code
 
-def can_exec(code):
-    if code != "":
+def can_exec(conv, code):
+    if code != "" and conv.passed_security_scan:
         return gr.Button(value="Approve and Execute", interactive=True)
     else:
         return gr.Button(value="Approve and Execute", interactive=False)
@@ -332,6 +334,14 @@ def clear_fn():
         show_copy_button=True, 
         lines=15, 
         max_lines=15
+    )] + [gr.Textbox(
+        value="",
+        label=sec_out_info_msg, 
+        elem_id="--primary-50", 
+        interactive=False, 
+        show_copy_button=True, 
+        lines=7, 
+        max_lines=7
     )]
 
 def vote(data: gr.LikeData):
@@ -424,7 +434,7 @@ def generate_response(conv: gr.State, history, model, language, stream):
 
 
 def web_ui():
-    global state, chatbot, script, out, exp_out, scan_stat
+    global state, chatbot, script, out, exp_out, scan_stat, sec_out
     with gr.Blocks(css=css, theme=gr.themes.Base(neutral_hue="slate")) as webUI:
         state = gr.State(ConvState())
         gr.Markdown(welcome_message)
@@ -434,9 +444,23 @@ def web_ui():
                     with gr.Row():
                         chatbot = gr.Chatbot(elem_id="chatbot-window", height=600)
                     with gr.Row():
-                        textbox = gr.Textbox(show_label=False, placeholder="Enter your prompt here and press ENTER", container=False, scale=16)
-                        submit = gr.Button(value="💬️", variant="primary", scale=2, elem_id="chatbot-button")
-                        clear_btn = gr.ClearButton(value="🗑️", scale=1, elem_id="chatbot-button")
+                        textbox = gr.Textbox(
+                            show_label=False, 
+                            placeholder="Enter your prompt here and press ENTER", 
+                            container=False, 
+                            scale=16
+                        )
+                        submit = gr.Button(
+                            value="💬️", 
+                            variant="primary", 
+                            scale=2, 
+                            elem_id="chatbot-button"
+                        )
+                        clear_btn = gr.ClearButton(
+                            value="🗑️", 
+                            scale=1, 
+                            elem_id="chatbot-button"
+                        )
             with gr.Column(scale=3):
                 with gr.Group(elem_id="script-group"):
                     with gr.Row():
@@ -445,16 +469,16 @@ def web_ui():
                     scan_stat = gr.Markdown(scan_empty_msg)
                     script = gr.Code(value="",label="Script", language = l_mapping[languages[0]], interactive=False, lines=16)
                     execute = gr.Button(value="Approve and Execute", interactive=False)
-        with gr.Accordion(label="Outputs", open=False):
-            out = gr.Textbox(value="",label="Output", interactive=False, show_copy_button=True, lines=15, max_lines=15)
-            exp_out = gr.Textbox(value="",label="Expected Output", interactive=False, lines=15, max_lines=15)
+        out = gr.Textbox(value="",label=output_info_msg, interactive=False, show_copy_button=True, lines=15, max_lines=15)
+        with gr.Accordion(label="Other Outputs", open=False):
+            exp_out = gr.Textbox(value="",label="Expected Output", interactive=False, lines=7, max_lines=7)
+            sec_out = gr.Textbox(value="",label=sec_out_info_msg, interactive=False, lines=7, max_lines=7)
         with gr.Accordion(label="Parameters", open=False):
             streaming = gr.Checkbox(label='Stream chat response', value=True)
             timeout = gr.Number(label="Timeout", precision=0, minimum=10, maximum=300, value=10)
             
         language.change(change_language, [language], [state, chatbot, script, out, exp_out], queue=False)
         model.change(change_model, None, [state, chatbot, script, out, exp_out], queue=False)
-        # script.change(can_exec, script, execute, queue=False)
         gr.on(
             [submit.click, textbox.submit],
             add_text, 
@@ -472,12 +496,12 @@ def web_ui():
         script.change(
             scan_fn_with_stream if streaming.value else scan_fn, 
             [state, chatbot, script, scan_stat, exp_out, model, language, streaming], 
-            [state, chatbot, out, script, scan_stat], queue=streaming,
+            [state, chatbot, sec_out, script, scan_stat], queue=streaming,
             show_progress=False
         ).then(
             can_exec, 
-            script, 
-            execute,
+            [state, script], 
+            [execute],
             show_progress=False,
             queue=False
         )
@@ -485,7 +509,7 @@ def web_ui():
         clear_btn.click(
             clear_fn, 
             None, 
-            [state, chatbot, script, exp_out, out],
+            [state, chatbot, script, exp_out, out, sec_out],
             show_progress=False,
             queue=False
         )
