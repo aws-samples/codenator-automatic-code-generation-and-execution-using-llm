@@ -27,6 +27,7 @@ def ping():
 
 @app.get("/list_languages")
 def list_languages():
+    print("languages")
     utils.LANGUAGES = get_languages()
     return json.dumps(utils.LANGUAGES)
 
@@ -36,7 +37,7 @@ async def generate(request: Request):
     prompt = params.get("prompt")
     model_family = params.get("model_family")
     model_name = params.get("model_name")
-    language = params.get("language")
+    language = params.get("language")    
     if not (prompt and model_family and model_name and language):
         raise
     model_type, can_stream = get_model_type(model_family, model_name)
