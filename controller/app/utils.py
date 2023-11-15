@@ -73,9 +73,10 @@ def send_req_to_agent(text, model_family, model_name, model_metadata, stream=Fal
                     else:
                         yield result
                         break
-                else:
-                    if res["generated_text"] != "":
-                        yield res["generated_text"]
+                elif res["generated_text"] != "":
+                    yield res["generated_text"]
+            elif "error"  in res:
+                raise Exception(f'Error {res["error"]}\StackTrace: {res.get("stacktrace","")}')
     
     data = {
         "body": {
@@ -93,7 +94,11 @@ def send_req_to_agent(text, model_family, model_name, model_metadata, stream=Fal
     if stream:
         return iter_func(ret, model_metadata)
     else:
-        return json.loads(ret.text)["generated_text"]
+        resp = json.loads(ret.text)
+        if "generated_text" in resp:
+            return resp["generated_text"]
+        else:
+            raise Exception(f'Error {resp["error"]}\StackTrace: {resp.get("stacktrace","")}')
 
 def security_scan_script(script, language, scanner="semgrep"):
     data = {

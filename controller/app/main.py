@@ -104,7 +104,7 @@ async def generate(request: Request):
         # Handle any exceptions that occur during execution
         tb = traceback.format_exc()
         logger.error(f"Error {e}\StackTrace: {tb}")
-        return json.dumps({"error": str(e), "stacktrace": tb})
+        return {"error": str(e), "stacktrace": tb}
 
 @app.post("/scan")
 async def scan(request: Request):
@@ -189,7 +189,7 @@ async def scan(request: Request):
     except Exception as e:
         tb = traceback.format_exc()
         logger.error(f"Error {e}\StackTrace: {tb}")
-        return json.dumps({"error": str(e), "stacktrace": tb})
+        return {"error": str(e), "stacktrace": tb}
 
 @app.post("/execute")
 async def execute(request: Request):
@@ -246,7 +246,7 @@ async def execute(request: Request):
             conv_id
         )
         res = conv.exec_script(script, expected_output)
-        if res["error"]:
+        if "error" in res:
             params["error_message"] = res["output"]
             conv.append_chat(
                 prompt_store.get_prompt_from_template(
@@ -275,7 +275,7 @@ async def execute(request: Request):
     except Exception as e:
         tb = traceback.format_exc()
         logger.error(f"Error {e}\StackTrace: {tb}")
-        return json.dumps({"error": str(e), "stacktrace": tb})
+        return {"error": str(e), "stacktrace": tb}
 
     
 if __name__ == "__main__":  

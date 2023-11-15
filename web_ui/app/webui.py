@@ -59,7 +59,18 @@ def scan_fn_with_stream(conv: gr.State, history, code, scan_status, exp_out, mod
             flag = True
             for chunk in response.iter_lines():
                 json_obj = json.loads(chunk)
-                if json_obj["vulnerabilities"] and len(json_obj["vulnerabilities"]) > 0:
+                if "error" in json_obj:
+                    message = f'\nStack Trace: {json_obj["stacktrace"]}' if "stacktrace" in json_obj else ""
+                    history[-1][1] = f'## ⛔️ **Agent encountered an error.**\n**Error:**{json_obj["error"]}{message}'
+                    conv = ConvState()
+                    yield {
+                        chatbot: history, 
+                        scan_stat: scan_empty_msg,
+                        sec_out:"",
+                        script: code
+                    }
+                    break
+                if "vulnerabilities" in json_obj and len(json_obj["vulnerabilities"]) > 0:
                     # gr.Warning("Code security scan detected some issues.")
                     output = gr.Textbox(
                         value=json_obj["vulnerabilities"],
@@ -69,6 +80,7 @@ def scan_fn_with_stream(conv: gr.State, history, code, scan_status, exp_out, mod
                         max_lines=7
                     )
                     code = json_obj["script"]
+                    
                     scan_status = scan_fail_msg
                     if flag:
                         history.append(
@@ -110,7 +122,7 @@ def scan_fn_with_stream(conv: gr.State, history, code, scan_status, exp_out, mod
                     yield {
                         state: conv
                     }            
-            history[-1][1] = history[-1][1][:-1]
+            history[-1][1] = history[-1][1].rstrip("▌")
     ret = {
         chatbot: history, 
         scan_stat: scan_status,
@@ -247,7 +259,7 @@ def execute_fn_with_stream(conv: gr.State, history, code, exp_out, model, langua
     flag = True
     for chunk in response.iter_lines():
         json_obj = json.loads(chunk)
-        if json_obj["error"]:
+        if "error" in json_obj:
             output = gr.Textbox(
                 value=json_obj["output"],
                 label=output_err_msg,
@@ -305,7 +317,7 @@ def execute_fn_with_stream(conv: gr.State, history, code, exp_out, model, langua
                     max_lines=15
                 )
         yield [history, output, code]
-    history[-1][1] = history[-1][1][:-1]
+    history[-1][1] = history[-1][1].rstrip("▌")
     yield history, output, code
 
 def can_exec(conv, code):
@@ -355,9 +367,7 @@ def add_text(message, history):
     return ["", history]
 
 def generate_response_with_stream(conv: gr.State, history, model, language, stream): 
-    """
-    Sample Response - to be deleted
-    """
+
     conv.passed_security_scan = False
     conv.scan_retries = 0
     data = json.dumps(
@@ -378,6 +388,17 @@ def generate_response_with_stream(conv: gr.State, history, model, language, stre
     
     for chunk in response.iter_lines():
         json_obj = json.loads(chunk)
+        if "error" in json_obj:
+            message = f'\nStack Trace: {json_obj["stacktrace"]}' if "stacktrace" in json_obj else ""
+            history[-1][1] = f'## ⛔️ **Agent encountered an error.**\n**Error:** {json_obj["error"]}{message}'
+            conv = ConvState()
+            yield {
+                state: conv,
+                chatbot: history,
+                script: "",
+                exp_out: ""
+            }
+            break
         # to avoid Gradio Markdown bug related to <output></output> bug
         history[-1][1] = (
             json_obj["generated_text"] + "▌"
@@ -388,28 +409,26 @@ def generate_response_with_stream(conv: gr.State, history, model, language, stre
             out_tag[1], 
             ex_out_tag[1]
         )
-        conv.conv_id = json_obj["conv_id"]
+        conv.conv_id = json_obj.get("conv_id", "")
         yield {
             state: conv,
             chatbot: history
         }
     
-    last_response = history[-1][1][:-1]
+    last_response = history[-1][1].rstrip("▌")
     
     history[-1][1] = last_response
-    conv.conv_id = json_obj["conv_id"]
+    conv.conv_id = json_obj.get("conv_id", "")
     
     yield {
         state: conv,
         chatbot: history,
-        script: json_obj["script"],
-        exp_out: json_obj["expected_output"]
+        script: json_obj.get("script",""),
+        exp_out: json_obj.get("expected_output","")
     }
 
 def generate_response(conv: gr.State, history, model, language, stream): 
-    """
-    Sample Response - to be deleted
-    """
+
     conv.passed_security_scan = False
     conv.scan_retries = 0
     data = json.dumps(
@@ -422,13 +441,22 @@ def generate_response(conv: gr.State, history, model, language, stream):
             "stream": stream
         }
     )
-    response = requests.post(
+    response = json.loads(
+        requests.post(
             "http://" + controller_url + "/generate",
             data=data
-        )
+        ).text
+    )
+    
+    if "error" in response:
+        message = f'\nStack Trace: {response["stacktrace"]}' if "stacktrace" in response else ""
+        history[-1][1] = f'## ⛔️ **Agent encountered an error.**\n**Error:**{response["error"]}{message}'
+        conv = ConvState()
+        return [conv, history, "", ""]
+    
 
-    res = json.loads(response.text)["generated_text"]
-    conv.conv_id = res["conv_id"]
+    res = response["generated_text"]
+    conv.conv_id = res.get("conv_id", "")
     history[-1][1] = json_obj["generated_text"]
     return [conv, history, res["script"], res["expected_output"]]
 
