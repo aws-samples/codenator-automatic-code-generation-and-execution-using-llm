@@ -66,21 +66,15 @@ def send_req_to_agent(text, model_family, model_name, model_metadata, stream=Fal
         for chunk in result.iter_lines():
             res = json.loads(chunk)
             if "generated_text"  in res and res["generated_text"] != model_metadata["EOS"]:
-                print("I am here")
                 if model_metadata["ROLES"][0] in res["generated_text"]:
-                    print("and here")
-                    result = res["generated_text"].split(model_metadata["ROLES"])[0]
+                    result = res["generated_text"].split(model_metadata["ROLES"][0])[0]
                     if result == "":
-                        print("but not here")
                         break
                     else:
-                        print("unlikely here")
                         yield result
                         break
                 else:
-                    print("probably here")
                     if res["generated_text"] != "":
-                        print("and here as well")
                         yield res["generated_text"]
     
     data = {
@@ -91,7 +85,6 @@ def send_req_to_agent(text, model_family, model_name, model_metadata, stream=Fal
         "model_family": model_family, 
         "model_name": model_name
     }
-    print(data)
     ret = requests.post(
         url=api_layer_url + ("" if not stream else "_stream"), 
         data=json.dumps(data),
