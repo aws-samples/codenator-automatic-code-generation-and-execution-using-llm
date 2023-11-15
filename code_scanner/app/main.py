@@ -4,6 +4,7 @@ import logging as logger
 from fastapi import FastAPI, Request
 import uvicorn
 from scanners.semgrep import SemgrepScanner
+import traceback
 
 app = FastAPI()
 
@@ -29,7 +30,9 @@ async def scan(request: Request):
         return scanner.scan(script, language)
     except Exception as e:
         # Handle any exceptions that occur during execution
-        return {"error": f"An error occurred: {str(e)}"}
+        tb = traceback.format_exc()
+        logger.error(f"Error {e}\nStackTrace: {tb}")
+        return {"error": f"An error occurred: {str(e)}", "stacktrace": tb}
 
     
 if __name__ == "__main__":  

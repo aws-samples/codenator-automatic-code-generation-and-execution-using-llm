@@ -16,13 +16,13 @@ models_list = {
         "model_family": "bedrock",
         "model_name": "anthropic.claude-v1"
     },
-    "CodeLlama7b": {
+    "Mistral7b-instruct": {
         "model_family": "sagemaker",
-        "model_name": "tgi.code-llama-endpoint"
+        "model_name": "tgi.jumpstart-dft-hf-llm-mistral-7b-instruct"
     },
-    "CodeLlama13b-instruct": {
+    "Llama13b": {
         "model_family": "sagemaker",
-        "model_name": "tgi.code-llama-13b-instruct-endpoint"
+        "model_name": "llama2js.jumpstart-dft-meta-textgeneration-llama-2-13b"
     }
 }
 
@@ -57,7 +57,7 @@ css = """
 """
 welcome_message="""
 # Welcome to Codenator 🤖️
-### Use this tool to generate and test code using LLMs
+### Allow me to help you develop secure and robust code
 """
 output_err_msg = "Output: ❌️ ERROR ❌️"
 output_wrn_msg = "Output: ⚠️ WARNING ⚠️ value does not match `Expected Output`"

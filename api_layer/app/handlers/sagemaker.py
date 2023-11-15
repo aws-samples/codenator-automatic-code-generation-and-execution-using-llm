@@ -4,6 +4,7 @@ import json
 import boto3
 from handlers.base import BaseModel, table_name
 import logging as logger
+import traceback
 
 
 class StreamIterator:
@@ -64,23 +65,30 @@ class model(BaseModel):
         ) = self.load_mappings(schema_path)
 
     def invoke(self, body):
-        request_body = self.form_request(
-            body,
-            self.request_defaults,
-            self.request_mapping
-        )
-        response = self.invoke_api(
-            EndpointName=self.endpoint_name,
-            Body=json.dumps(request_body).encode("utf-8"),
-            ContentType="application/json"
-        )
-        res_body = response["Body"].read().decode("utf-8")
-        res = self.parse_response(
-            res_body,
-            self.response_mapping,
-            self.response_regex
-        )
-        return res
+        try:
+            request_body = self.form_request(
+                body,
+                self.request_defaults,
+                self.request_mapping
+            )
+            response = self.invoke_api(
+                EndpointName=self.endpoint_name,
+                Body=json.dumps(request_body).encode("utf-8"),
+                ContentType="application/json",
+                CustomAttributes="accept_eula=true"
+            )
+            res_body = response["Body"].read().decode("utf-8")
+            res = self.parse_response(
+                res_body,
+                self.response_mapping,
+                self.response_regex
+            )
+            return res
+        except Exception as e:
+            tb = traceback.format_exc()
+            logger.error(f"Error {e}\nBody: {body}\n StackTrace: {tb}")
+            return {"error": e, "stacktrace": tb}
+    
 
     def invoke_with_response_stream(self, body):
         try:
@@ -93,7 +101,8 @@ class model(BaseModel):
             response = self.invoke_api_with_response_stream(
                 EndpointName=self.endpoint_name,
                 Body=json.dumps(request_body).encode("utf-8"),
-                ContentType="application/json"
+                ContentType="application/json",
+                CustomAttributes="accept_eula=true"
             )
             for line in self.stream_iter(response["Body"]):
                 if line:
@@ -104,5 +113,6 @@ class model(BaseModel):
                     )
                     yield output
         except Exception as e:
-            logger.error(f"Error {e}, Body {body}")
-            yield {"error": f"Error {e}, Body {body}"}
+            tb = traceback.format_exc()
+            logger.error(f"Error {e}\nBody: {body}\n StackTrace: {tb}")
+            yield {"error": e, "stacktrace": tb}

@@ -17,6 +17,8 @@ class SemgrepScanner(BaseScanner):
         
     def scan(self, script, language):
         results = super().scan(script, language)
+        if len(results) > 0:
+            return results
         proc = subprocess.Popen(self.cmd + [self.file_name], stdout=subprocess.PIPE)
         scan_results = json.loads(proc.stdout.read())
         output = {}

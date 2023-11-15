@@ -320,10 +320,10 @@ def change_language(language):
     Code Languages
     approved language: [('python', 'markdown', 'json', 'html', 'css', 'javascript', 'typescript', 'yaml', 'dockerfile', 'shell', 'r')]
     """
-    return ["", []] + [gr.Code(value="", language=l_mapping[language], interactive=False)] + [""] * 2
+    return [ConvState(), []] + [gr.Code(value="", language=l_mapping[language], interactive=False)] + [""] * 2
 
 def change_model():
-    return ["", []] + [""] * 3
+    return [ConvState(), []] + [""] * 3
 
 def clear_fn():
     return [ConvState(), [], "", ""] + [gr.Textbox(

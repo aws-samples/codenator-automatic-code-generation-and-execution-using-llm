@@ -4,6 +4,7 @@ import json
 import boto3
 from handlers.base import BaseModel, table_name
 import logging as logger
+import traceback
 
 
 class StreamIterator:
@@ -81,8 +82,9 @@ class model(BaseModel):
             )
             return res
         except Exception as e:
-            logger.error(f"Error {e}, Body {body}")
-            raise e
+            tb = traceback.format_exc()
+            logger.error(f"Error {e}\nBody: {body}\n StackTrace: {tb}")
+            return {"error": e, "stacktrace": tb}
 
     def invoke_with_response_stream(self, body):
         try:
@@ -105,5 +107,6 @@ class model(BaseModel):
                     )
                 yield output
         except Exception as e:
-            logger.error(f"Error {e}, Body {body}")
-            raise e
+            tb = traceback.format_exc()
+            logger.error(f"Error {e}\nBody: {body}\n StackTrace: {tb}")
+            yield {"error": e, "stacktrace": tb}

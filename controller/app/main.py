@@ -1,5 +1,6 @@
 import argparse
 import requests
+import traceback
 import json
 import logging as logger
 from fastapi import FastAPI, Request
@@ -27,62 +28,68 @@ def ping():
 
 @app.get("/list_languages")
 def list_languages():
-    print("languages")
-    utils.LANGUAGES = get_languages()
-    return json.dumps(utils.LANGUAGES)
+    try:
+        utils.LANGUAGES = get_languages()
+        return json.dumps(utils.LANGUAGES)
+    except Exception as e:
+        tb = traceback.format_exc()
+        logger.error(f"Error {e}\StackTrace: {tb}")
+        return json.dumps({"error": e, "stacktrace": tb})
 
 @app.post("/generate")
 async def generate(request: Request):
-    params = await request.json()
-    prompt = params.get("prompt")
-    model_family = params.get("model_family")
-    model_name = params.get("model_name")
-    language = params.get("language")    
-    if not (prompt and model_family and model_name and language):
-        raise
-    model_type, can_stream = get_model_type(model_family, model_name)
-    if model_type == "":
-        return {"error": "Unknown model"}
-    conv_id = params.get("conv_id", "")
-    stream = params.get("stream", False)
-    if stream:
-        stream = can_stream
-    utils.LANGUAGES = get_languages()
-    params = {
-        "display_name": utils.LANGUAGES[language]["display_name"],
-        "tag_name": utils.LANGUAGES[language]["tag_name"],
-        "error_message": "",
-        "script_output": "",
-        "language_instructions": utils.LANGUAGES[language]["language_instructions"]
-    }
-    
-    model_metadata = get_model_metadata(model_type)
-    
-    conv = Conversation(
-        model_metadata["ROLES"], 
-        prompt_store.get_prompt_from_template(
-            model_metadata["SYSTEM_PROMPT_TMPLT"],
-            params
-        ),
-        send_req_to_agent,
-        security_scan_script,
-        send_script_to_exc,
-        extract_script,
-        language,
-        model_family,
-        model_name,
-        model_metadata,
-        conv_id
-    )
-    conv.append_chat(
-        prompt_store.get_prompt_from_template(
-            model_metadata["AGENT_REPLY_TMPLT"],
-            params
-        ),
-        1
-    )
-    conv.append_chat(prompt)
     try:
+        params = await request.json()
+        prompt = params.get("prompt")
+        model_family = params.get("model_family")
+        model_name = params.get("model_name")
+        language = params.get("language")    
+        if not (prompt and model_family and model_name and language):
+            return {"error": f"Request must supply `prompt`, `model_family`, `model_name` and `language` paramaters"}
+        model_type, can_stream = get_model_type(model_family, model_name)
+        if model_type == "":
+            return {"error": f"Unknown model!\nmodel_family: {model_family}, model_name: {model_name}"}
+        conv_id = params.get("conv_id", "")
+        stream = params.get("stream", False)
+        if stream:
+            stream = can_stream
+
+        utils.LANGUAGES = get_languages()
+        params = {
+            "display_name": utils.LANGUAGES[language]["display_name"],
+            "tag_name": utils.LANGUAGES[language]["tag_name"],
+            "error_message": "",
+            "script_output": "",
+            "language_instructions": utils.LANGUAGES[language]["language_instructions"]
+        }
+    
+        model_metadata = get_model_metadata(model_type)
+
+        conv = Conversation(
+            model_metadata["ROLES"], 
+            prompt_store.get_prompt_from_template(
+                model_metadata["SYSTEM_PROMPT_TMPLT"],
+                params
+            ),
+            send_req_to_agent,
+            security_scan_script,
+            send_script_to_exc,
+            extract_script,
+            language,
+            model_family,
+            model_name,
+            model_metadata,
+            conv_id
+        )
+        conv.append_chat(
+            prompt_store.get_prompt_from_template(
+                model_metadata["AGENT_REPLY_TMPLT"],
+                params
+            ),
+            1
+        )
+        conv.append_chat(prompt)
+        
         res = conv.send_to_agent(stream)
         if not res:
             raise
@@ -95,7 +102,9 @@ async def generate(request: Request):
             return res
     except Exception as e:
         # Handle any exceptions that occur during execution
-        return {"error": f"An error occurred: {str(e)}"}
+        tb = traceback.format_exc()
+        logger.error(f"Error {e}\StackTrace: {tb}")
+        return json.dumps({"error": str(e), "stacktrace": tb})
 
 @app.post("/scan")
 async def scan(request: Request):
@@ -108,48 +117,49 @@ async def scan(request: Request):
                 yield json.dumps(result) + "\n"
         else:
             yield json.dumps(scan_result) + "\n"
-            
-    params = await request.json()
-    script = params.get("script")
-    model_family = params.get("model_family")
-    model_name = params.get("model_name")
-    language = params.get("language")
-    conv_id = params.get("conv_id")
-    if not (script and conv_id and model_family and model_name and language):
-        raise
-    model_type, can_stream = get_model_type(model_family, model_name)
-    if model_type == "":
-        return {"error": "Unknown model"}
-    stream = params.get("stream", False)
-    if stream:
-        stream = can_stream
-    utils.LANGUAGES = get_languages()
-    params = {
-        "display_name": utils.LANGUAGES[language]["display_name"],
-        "tag_name": utils.LANGUAGES[language]["tag_name"],
-        "error_message": "",
-        "script_output": "",
-        "language_instructions": utils.LANGUAGES[language]["language_instructions"]
-    }
-    
-    model_metadata = get_model_metadata(model_type)
-    conv = Conversation(
-        model_metadata["ROLES"], 
-        prompt_store.get_prompt_from_template(
-            model_metadata["SYSTEM_PROMPT_TMPLT"],
-            params
-        ),
-        send_req_to_agent,
-        security_scan_script,
-        send_script_to_exc,
-        extract_script,
-        language,
-        model_family,
-        model_name,
-        model_metadata,
-        conv_id
-    )
     try:
+        params = await request.json()
+        script = params.get("script")
+        model_family = params.get("model_family")
+        model_name = params.get("model_name")
+        language = params.get("language")
+        conv_id = params.get("conv_id")
+        if not (script and conv_id and model_family and model_name and language):
+            return {"error": f"Request must supply `script`, `conv_id`, `model_family`, `model_name` and `language` paramaters"}
+        model_type, can_stream = get_model_type(model_family, model_name)
+        if model_type == "":
+            return {"error": f"Unknown model!\nmodel_family: {model_family}, model_name: {model_name}"}
+        stream = params.get("stream", False)
+        if stream:
+            stream = can_stream
+
+        utils.LANGUAGES = get_languages()
+        params = {
+            "display_name": utils.LANGUAGES[language]["display_name"],
+            "tag_name": utils.LANGUAGES[language]["tag_name"],
+            "error_message": "",
+            "script_output": "",
+            "language_instructions": utils.LANGUAGES[language]["language_instructions"]
+        }
+    
+        model_metadata = get_model_metadata(model_type)
+        conv = Conversation(
+            model_metadata["ROLES"], 
+            prompt_store.get_prompt_from_template(
+                model_metadata["SYSTEM_PROMPT_TMPLT"],
+                params
+            ),
+            send_req_to_agent,
+            security_scan_script,
+            send_script_to_exc,
+            extract_script,
+            language,
+            model_family,
+            model_name,
+            model_metadata,
+            conv_id
+        )
+
         res = conv.scan_script(script)
         if len(res["vulnerabilities"]) > 0:
             params["vulnerabilities"] = res["vulnerabilities"]
@@ -177,8 +187,9 @@ async def scan(request: Request):
             else:
                 return res
     except Exception as e:
-        # Handle any exceptions that occur during execution
-        return {"error": f"An error occurred: {str(e)}"}
+        tb = traceback.format_exc()
+        logger.error(f"Error {e}\StackTrace: {tb}")
+        return json.dumps({"error": str(e), "stacktrace": tb})
 
 @app.post("/execute")
 async def execute(request: Request):
@@ -192,48 +203,48 @@ async def execute(request: Request):
                 yield json.dumps(result) + "\n"
         else:
             yield json.dumps(exec_result) + "\n"
-            
-    params = await request.json()
-    script = params.get("script")
-    expected_output = params.get("expected_output", "")
-    model_family = params.get("model_family")
-    model_name = params.get("model_name")
-    language = params.get("language")
-    conv_id = params.get("conv_id")
-    if not (script and conv_id and model_family and model_name and language):
-        raise
-    model_type, can_stream = get_model_type(model_family, model_name)
-    if model_type == "":
-        return {"error": "Unknown model"}
-    stream = params.get("stream", False)
-    if stream:
-        stream = can_stream
-    utils.LANGUAGES = get_languages()
-    params = {
-        "display_name": utils.LANGUAGES[language]["display_name"],
-        "tag_name": utils.LANGUAGES[language]["tag_name"],
-        "error_message": "",
-        "script_output": "",
-        "language_instructions": utils.LANGUAGES[language]["language_instructions"]
-    }
-    
-    model_metadata = get_model_metadata(model_type)
-    conv = Conversation(
-        model_metadata["ROLES"], 
-        prompt_store.get_prompt_from_template(
-            model_metadata["SYSTEM_PROMPT_TMPLT"],
-            params
-        ),
-        send_req_to_agent,
-        send_script_to_exc,
-        extract_script,
-        language,
-        model_family,
-        model_name,
-        model_metadata,
-        conv_id
-    )
     try:
+        params = await request.json()
+        script = params.get("script")
+        expected_output = params.get("expected_output", "")
+        model_family = params.get("model_family")
+        model_name = params.get("model_name")
+        language = params.get("language")
+        conv_id = params.get("conv_id")
+        if not (script and conv_id and model_family and model_name and language):
+            return {"error": f"Request must supply `script`, `conv_id`, `model_family`, `model_name` and `language` paramaters"}
+        model_type, can_stream = get_model_type(model_family, model_name)
+        if model_type == "":
+            return {"error": f"Unknown model!\nmodel_family: {model_family}, model_name: {model_name}"}
+        stream = params.get("stream", False)
+        if stream:
+            stream = can_stream
+
+        utils.LANGUAGES = get_languages()
+        params = {
+            "display_name": utils.LANGUAGES[language]["display_name"],
+            "tag_name": utils.LANGUAGES[language]["tag_name"],
+            "error_message": "",
+            "script_output": "",
+            "language_instructions": utils.LANGUAGES[language]["language_instructions"]
+        }
+
+        model_metadata = get_model_metadata(model_type)
+        conv = Conversation(
+            model_metadata["ROLES"], 
+            prompt_store.get_prompt_from_template(
+                model_metadata["SYSTEM_PROMPT_TMPLT"],
+                params
+            ),
+            send_req_to_agent,
+            send_script_to_exc,
+            extract_script,
+            language,
+            model_family,
+            model_name,
+            model_metadata,
+            conv_id
+        )
         res = conv.exec_script(script, expected_output)
         if res["error"]:
             params["error_message"] = res["output"]
@@ -262,8 +273,9 @@ async def execute(request: Request):
             else:
                 return res
     except Exception as e:
-        # Handle any exceptions that occur during execution
-        return {"error": f"An error occurred: {str(e)}"}
+        tb = traceback.format_exc()
+        logger.error(f"Error {e}\StackTrace: {tb}")
+        return json.dumps({"error": str(e), "stacktrace": tb})
 
     
 if __name__ == "__main__":  

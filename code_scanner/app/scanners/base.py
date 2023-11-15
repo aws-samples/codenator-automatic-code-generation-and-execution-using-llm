@@ -1,3 +1,6 @@
+import traceback
+import logging as logger
+
 class BaseScanner:
     file_ext = {
         "Python": ".py",
@@ -19,6 +22,11 @@ class BaseScanner:
             raise f"UnSupported programming language {language}, supported languages are {self.file_ext.keys()}"
     
     def scan(self, script, language):
-        self.validate(language)
-        self.save_script(script, language)
-        return []
+        try:
+            self.validate(language)
+            self.save_script(script, language)
+            return []
+        except Exception as e:
+            tb = traceback.format_exc()
+            logger.error(f"Error {e}\nStackTrace: {tb}")
+            return [{"error": e, "stacktrace": tb}]

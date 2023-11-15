@@ -5,6 +5,7 @@ import logging as logger
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
 from handlers import base
+import traceback
 
 import uvicorn
 
@@ -19,24 +20,29 @@ def ping():
 
 @app.get("/list_models")
 def list_models():
-    if base.table_name == "":
-        all_models_file_path = "handlers/schemas/all-models.json"
-        with open(all_models_file_path, "r") as all_models_file:
-            all_models = json.load(all_models_file)
-            return {"models": all_models}
-    else:
-        all_models = base.ddb_client.get_item(
-            TableName=base.table_name,
-            Key={
-                "pk": {
-                    "S": "models"
-                },
-                "sk": {
-                    "S": "all-models"
+    try:
+        if base.table_name == "":
+            all_models_file_path = "handlers/schemas/all-models.json"
+            with open(all_models_file_path, "r") as all_models_file:
+                all_models = json.load(all_models_file)
+                return {"models": all_models}
+        else:
+            all_models = base.ddb_client.get_item(
+                TableName=base.table_name,
+                Key={
+                    "pk": {
+                        "S": "models"
+                    },
+                    "sk": {
+                        "S": "all-models"
+                    }
                 }
-            }
-        )["Item"]["models"]["S"]
-        return {"models": json.loads(all_models)}
+            )["Item"]["models"]["S"]
+            return {"models": json.loads(all_models)}
+    except Exception as e:
+        # Handle any exceptions that occur during execution
+        tb = traceback.format_exc()
+        return {"error": f"An error occurred: {str(e)}", "stacktrace": tb }
 
 
 @app.post("/invoke")
@@ -55,13 +61,19 @@ async def invoke(request: Request):
 
     except Exception as e:
         # Handle any exceptions that occur during execution
-        return {"error": f"An error occurred: {str(e)}" }
+        tb = traceback.format_exc()
+        return {"error": f"An error occurred: {str(e)}", "stacktrace": tb }
 
 
 async def invoke_with_response_stream(stream_response):
-    for next_item in stream_response:
-        # if "generated_text"  in next_item and next_item["generated_text"] != "<EOS_TOKEN>":
-        yield json.dumps(next_item) + "\n"
+    try:
+        for next_item in stream_response:
+            # if "generated_text"  in next_item and next_item["generated_text"] != "<EOS_TOKEN>":
+            yield json.dumps(next_item) + "\n"
+    except Exception as e:
+        # Handle any exceptions that occur during execution
+        tb = traceback.format_exc()
+        yield json.dumps({"error": f"An error occurred: {str(e)}", "stacktrace": tb }) + "\n"
 
 
 @app.post("/invoke_stream")
@@ -84,7 +96,8 @@ async def invoke_stream(request: Request):
         )
     except Exception as e:
         # Handle any exceptions that occur during execution
-        return {"error": f"An error occurred: {str(e)}"}
+        tb = traceback.format_exc()
+        return {"error": f"An error occurred: {str(e)}", "stacktrace": tb }
 
 
 if __name__ == "__main__":
