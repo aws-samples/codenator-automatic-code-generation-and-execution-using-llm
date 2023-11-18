@@ -1,6 +1,12 @@
 import uuid
 import utils
 import json
+from utils import (
+    send_req_to_agent,
+    security_scan_script,
+    send_script_to_exc,
+    extract_script
+)
 
 CONVERSATIONS = {}
 
@@ -8,15 +14,12 @@ class Conversation:
     def __init__(
         self, 
         roles, 
-        prompt, 
-        agent,
-        scanner,
-        executor,
-        script_extractor,
+        prompt,
         language,
         model_family,
         model_name,
         model_metadata,
+        model_params,
         conv_id: str=""
     ):
         self.id = conv_id if conv_id != "" and conv_id in CONVERSATIONS else uuid.uuid4().hex[:16]
@@ -30,14 +33,15 @@ class Conversation:
         else:
             self.history = CONVERSATIONS[self.id]["history"]
             self.last_agent_message = CONVERSATIONS[self.id]["last_agent_message"]
-        self.agent = agent
-        self.scanner = scanner
-        self.executor = executor
-        self.script_extractor = script_extractor
+        self.agent = send_req_to_agent
+        self.scanner = security_scan_script
+        self.executor = send_script_to_exc
+        self.script_extractor = extract_script
         self.language = language
         self.model_family = model_family
         self.model_name = model_name
         self.model_metadata = model_metadata
+        self.params = model_params
         
     def append_chat(self, text, role=0):
         self.history += "\n" + self.roles[role] + text
@@ -72,12 +76,13 @@ class Conversation:
                 yield json.dumps(ret) + "\n"
         
         self.append_chat("", 1)
+        self.params["prompt"] = self.history
+        self.params["stream"] = stream
         res = self.agent(
-            self.history,
+            self.params,
             self.model_family,
             self.model_name,
-            self.model_metadata,
-            stream
+            self.model_metadata
         )
         ret = {}
         if stream:
@@ -96,18 +101,18 @@ class Conversation:
         res["conv_id"] = self.id
         return res
     
-    def exec_script(self, script, expected_output):
+    def exec_script(self, script, expected_output, timeout=10):
         output_res = ""
         if utils.LANGUAGES[self.language]["pre_exec_script"]:
             output_res += self.executor(
                 utils.LANGUAGES[self.language]["pre_exec_script"], 
                 utils.LANGUAGES[self.language]["kernel_name"]
             )["output"]
-        res = self.executor(script, utils.LANGUAGES[self.language]["kernel_name"])
+        res = self.executor(script, utils.LANGUAGES[self.language]["kernel_name"], timeout)
         res["output"] = output_res + res["output"]
         if utils.LANGUAGES[self.language]["post_exec_script"]:
             res["output"] += self.executor(
-                utils.LANGUAGES[self.language]["post_exec_script"], 
+                utils.LANGUAGES[self.languages2]["post_exec_script"], 
                 utils.LANGUAGES[self.language]["kernel_name"]
             )["output"]
         res["script"] = script

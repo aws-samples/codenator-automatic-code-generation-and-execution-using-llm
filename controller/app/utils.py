@@ -2,7 +2,7 @@ from importlib import import_module
 import requests
 import json
 import boto3
-
+import base64
 
 LANGUAGES = {}
 api_layer_url = ""
@@ -10,6 +10,24 @@ code_executor_url = ""
 code_scanner_url = ""
 model_metadata = {}
 models_metadata_db  = ""
+cypher = None
+
+class EncryptorClass:
+    def __init__(self, key_id):
+        self.kms_client = boto3.client("kms")
+        self.key_id = key_id
+    def encrypt(self, text):
+        ret = self.kms_client.encrypt(
+            KeyId=self.key_id,
+            Plaintext=text
+        )
+        return base64.b64encode(ret["CiphertextBlob"]).decode()
+    def decrypt(self, cipher_text_blob):
+        ret = self.kms_client.decrypt(
+            KeyId=self.key_id,
+            CiphertextBlob=base64.b64decode(cipher_text_blob)
+        )
+        return ret["Plaintext"].decode()
 
 def get_models_list():
     ret = requests.get(url=api_layer_url.split("/invoke")[0] + "/list_models")
@@ -61,7 +79,7 @@ def get_languages():
     else:
         return LANGUAGES
 
-def send_req_to_agent(text, model_family, model_name, model_metadata, stream=False):
+def send_req_to_agent(body, model_family, model_name, model_metadata):
     def iter_func(result, model_metadata):
         for chunk in result.iter_lines():
             res = json.loads(chunk)
@@ -79,19 +97,16 @@ def send_req_to_agent(text, model_family, model_name, model_metadata, stream=Fal
                 raise Exception(f'Error {res["error"]}\StackTrace: {res.get("stacktrace","")}')
     
     data = {
-        "body": {
-            "prompt": text,
-            "stream": stream
-        }, 
+        "body": body, 
         "model_family": model_family, 
         "model_name": model_name
     }
     ret = requests.post(
-        url=api_layer_url + ("" if not stream else "_stream"), 
+        url=api_layer_url + ("" if not body["stream"] else "_stream"), 
         data=json.dumps(data),
-        stream=stream
+        stream=body["stream"]
     )
-    if stream:
+    if body["stream"]:
         return iter_func(ret, model_metadata)
     else:
         resp = json.loads(ret.text)
@@ -112,10 +127,12 @@ def security_scan_script(script, language, scanner="semgrep"):
     )
     return json.loads(ret.text)
 
-def send_script_to_exc(script, kernel_name):
+def send_script_to_exc(script, kernel_name, timeout=10):
+    script_blob = cypher.encrypt(script)
     data = {
-        "code": script, 
-        "kernel_name": kernel_name
+        "code": script_blob, 
+        "kernel_name": kernel_name,
+        "timeout": timeout
     }
     ret = requests.post(
         url=code_executor_url, 

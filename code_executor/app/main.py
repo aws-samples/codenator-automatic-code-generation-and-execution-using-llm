@@ -7,6 +7,7 @@ import uvicorn
 import pkg_resources
 from JupyterClient import JupyterNotebook, JupyterKernels
 import traceback
+from utils import EncryptorClass
 
 app = FastAPI()
 
@@ -38,12 +39,13 @@ def list_kernel_specs():
 
 @app.post("/execute_code")
 async def execute_code(request: Request):
-    params = await request.json()
-    code = params.get("code")
-    timeout = params.get("timeout", 10)
-    kernel_name = params.get("kernel_name", "python3")
-    if code:
-        try:
+    try:
+        params = await request.json()
+        code_blob = params.get("code")
+        timeout = params.get("timeout", 10)
+        kernel_name = params.get("kernel_name", "python3")
+        if code_blob != "":
+            code = decryptor.decrypt(code_blob)
             nb = JupyterNotebook(kernel_name=kernel_name)
             out, error = nb.run_cell(code, timeout)            
             return {"output": out, "error": error}
@@ -51,15 +53,17 @@ async def execute_code(request: Request):
         # java? https://github.com/SpencerPark/IJava
         # bash script? https://pypi.org/project/bash_kernel/
 
-        except Exception as e:
-            # Handle any exceptions that occur during execution
-            return {"error": f"An error occurred: {str(e)}", "stacktrace": traceback.format_exc()}
+    except Exception as e:
+        # Handle any exceptions that occur during execution
+        return {"error": f"An error occurred: {str(e)}", "stacktrace": traceback.format_exc()}
 
 if __name__ == "__main__":  
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", type=str, default="localhost")
     parser.add_argument("--port", type=int, default=8080)
+    parser.add_argument("--kms", type=str)
     args = parser.parse_args()
     jk = JupyterKernels()
+    decryptor = EncryptorClass(key_id=args.kms)
     logger.info(f"args: {args}")
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")

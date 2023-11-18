@@ -16,7 +16,8 @@ from utils import (
     send_req_to_agent,
     security_scan_script,
     send_script_to_exc,
-    extract_script
+    extract_script,
+    EncryptorClass
 )
 
 app = FastAPI()
@@ -40,13 +41,22 @@ def list_languages():
 async def generate(request: Request):
     try:
         params = await request.json()
+        req_params = [
+            "prompt",
+            "model_family",
+            "model_name",
+            "language"
+        ]
+        for req_param in req_params:
+            if req_param not in params:
+                return {"error": f"Request must contain [{req_param}] parameter."}
         prompt = params.get("prompt")
+        model_params = params.get("model_params")
         model_family = params.get("model_family")
         model_name = params.get("model_name")
-        language = params.get("language")    
-        if not (prompt and model_family and model_name and language):
-            return {"error": f"Request must supply `prompt`, `model_family`, `model_name` and `language` paramaters"}
+        language = params.get("language")
         model_type, can_stream = get_model_type(model_family, model_name)
+        model_type = params.get("model_type", model_type)
         if model_type == "":
             return {"error": f"Unknown model!\nmodel_family: {model_family}, model_name: {model_name}"}
         conv_id = params.get("conv_id", "")
@@ -71,14 +81,11 @@ async def generate(request: Request):
                 model_metadata["SYSTEM_PROMPT_TMPLT"],
                 params
             ),
-            send_req_to_agent,
-            security_scan_script,
-            send_script_to_exc,
-            extract_script,
             language,
             model_family,
             model_name,
             model_metadata,
+            model_params,
             conv_id
         )
         conv.append_chat(
@@ -119,16 +126,26 @@ async def scan(request: Request):
             yield json.dumps(scan_result) + "\n"
     try:
         params = await request.json()
+        req_params = [
+            "script",
+            "model_family",
+            "model_name",
+            "language",
+            "conv_id"
+        ]
+        for req_param in req_params:
+            if req_param not in params:
+                return {"error": f"Request must contain [{req_param}] parameter."}
         script = params.get("script")
         model_family = params.get("model_family")
         model_name = params.get("model_name")
         language = params.get("language")
         conv_id = params.get("conv_id")
-        if not (script and conv_id and model_family and model_name and language):
-            return {"error": f"Request must supply `script`, `conv_id`, `model_family`, `model_name` and `language` paramaters"}
         model_type, can_stream = get_model_type(model_family, model_name)
+        model_type = params.get("model_type", model_type)
         if model_type == "":
             return {"error": f"Unknown model!\nmodel_family: {model_family}, model_name: {model_name}"}
+        model_params = params.get("model_params")
         stream = params.get("stream", False)
         if stream:
             stream = can_stream
@@ -149,14 +166,11 @@ async def scan(request: Request):
                 model_metadata["SYSTEM_PROMPT_TMPLT"],
                 params
             ),
-            send_req_to_agent,
-            security_scan_script,
-            send_script_to_exc,
-            extract_script,
             language,
             model_family,
             model_name,
             model_metadata,
+            model_params,
             conv_id
         )
 
@@ -205,20 +219,31 @@ async def execute(request: Request):
             yield json.dumps(exec_result) + "\n"
     try:
         params = await request.json()
+        req_params = [
+            "script",
+            "model_family",
+            "model_name",
+            "language",
+            "conv_id"
+        ]
+        for req_param in req_params:
+            if req_param not in params:
+                return {"error": f"Request must contain [{req_param}] parameter."}
         script = params.get("script")
         expected_output = params.get("expected_output", "")
         model_family = params.get("model_family")
         model_name = params.get("model_name")
         language = params.get("language")
         conv_id = params.get("conv_id")
-        if not (script and conv_id and model_family and model_name and language):
-            return {"error": f"Request must supply `script`, `conv_id`, `model_family`, `model_name` and `language` paramaters"}
         model_type, can_stream = get_model_type(model_family, model_name)
+        model_type = params.get("model_type", model_type)
         if model_type == "":
             return {"error": f"Unknown model!\nmodel_family: {model_family}, model_name: {model_name}"}
         stream = params.get("stream", False)
+        timeout = params.get("timeout")
         if stream:
             stream = can_stream
+        model_params = params.get("model_params")
 
         utils.LANGUAGES = get_languages()
         params = {
@@ -236,17 +261,16 @@ async def execute(request: Request):
                 model_metadata["SYSTEM_PROMPT_TMPLT"],
                 params
             ),
-            send_req_to_agent,
-            send_script_to_exc,
-            extract_script,
             language,
             model_family,
             model_name,
             model_metadata,
+            model_params,
             conv_id
         )
-        res = conv.exec_script(script, expected_output)
-        if "error" in res:
+        res = conv.exec_script(script, expected_output, timeout)
+
+        if res["error"]:
             params["error_message"] = res["output"]
             conv.append_chat(
                 prompt_store.get_prompt_from_template(
@@ -290,6 +314,7 @@ if __name__ == "__main__":
     parser.add_argument("--code-scanner-port", type=int, default=8080)
     parser.add_argument("--prompt-database-file", type=str, default="prompt/database.json")
     parser.add_argument("--prompt-store-name", type=str, default="")
+    parser.add_argument("--kms", type=str)
     parser.add_argument("--models-metadata-db", type=str, default="")
     parser.add_argument("--models-metadata-file", type=str, default="config/model_meta.json")
     parser.add_argument("--languages-file", type=str, default="config/languages.json")
@@ -304,6 +329,7 @@ if __name__ == "__main__":
         external_store=True if args.prompt_store_name != "" else False, 
         ddb_table_name=args.prompt_store_name
     )
+    utils.cypher = EncryptorClass(args.kms)
     if args.prompt_store_name == "":
         prompt_store.read_from_json(args.prompt_database_file)
     if args.models_metadata_db == "":

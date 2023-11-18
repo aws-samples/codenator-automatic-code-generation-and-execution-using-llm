@@ -10,6 +10,7 @@ from constants import (
     max_security_scan_retries,
     css,
     welcome_message,
+    instructions,
     output_err_msg,
     output_wrn_msg,
     output_info_msg,
@@ -17,7 +18,8 @@ from constants import (
     scan_pass_msg,
     scan_empty_msg,
     sec_out_err_msg,
-    sec_out_info_msg
+    sec_out_info_msg,
+    task_store_prompt
 )
 
 # Global
@@ -28,7 +30,19 @@ class ConvState:
         self.passed_security_scan = False
         self.scan_retries = 0
 
-def scan_fn_with_stream(conv: gr.State, history, code, scan_status, exp_out, model, language, stream):
+def scan_fn_with_stream(
+    conv: gr.State, 
+    history, 
+    code, 
+    scan_status, 
+    exp_out, 
+    model, 
+    language, 
+    stream,
+    temprature, 
+    top_p, 
+    top_k
+):
     output = gr.Textbox(
         value="",
         label=sec_out_info_msg, 
@@ -48,7 +62,12 @@ def scan_fn_with_stream(conv: gr.State, history, code, scan_status, exp_out, mod
                     "language": language,
                     "expected_output": exp_out,
                     "conv_id": conv.conv_id,
-                    "stream": stream
+                    "stream": stream,
+                    "model_params": {
+                        "temprature": temprature,
+                        "top_p": top_p,
+                        "top_k": top_k
+                    }
                 }
             )
             response = requests.post(
@@ -132,7 +151,19 @@ def scan_fn_with_stream(conv: gr.State, history, code, scan_status, exp_out, mod
         ret[script] = code
     yield ret
 
-def scan_fn(conv: gr.State, history, code, scan_status, exp_out, model, language, stream):
+def scan_fn(
+    conv: gr.State, 
+    history, 
+    code, 
+    scan_status, 
+    exp_out, 
+    model, 
+    language, 
+    stream,
+    temprature, 
+    top_p, 
+    top_k
+):
     output = gr.Textbox(
         value="",
         label=sec_out_info_msg, 
@@ -152,7 +183,12 @@ def scan_fn(conv: gr.State, history, code, scan_status, exp_out, model, language
                     "language": language,
                     "expected_output": exp_out,
                     "conv_id": conv.conv_id,
-                    "stream": stream
+                    "stream": stream,
+                    "model_params": {
+                        "temprature": temprature,
+                        "top_p": top_p,
+                        "top_k": top_k
+                    }
                 }
             )
             response = requests.post(
@@ -189,7 +225,18 @@ def scan_fn(conv: gr.State, history, code, scan_status, exp_out, model, language
     else:
         return {}
 
-def execute_fn(conv: gr.State, history, code, exp_out, model, language, stream):
+def execute_fn(
+    conv: gr.State, 
+    history, 
+    code, 
+    exp_out, 
+    model, 
+    language, 
+    stream,
+    temprature, 
+    top_p, 
+    top_k
+):
     data = json.dumps(
         {
             "script": code,
@@ -198,7 +245,12 @@ def execute_fn(conv: gr.State, history, code, exp_out, model, language, stream):
             "language": language,
             "expected_output": exp_out,
             "conv_id": conv.conv_id,
-            "stream": stream
+            "stream": stream,
+            "model_params": {
+                "temprature": temprature,
+                "top_p": top_p,
+                "top_k": top_k
+            }
         }
     )
     response = requests.post(
@@ -239,7 +291,19 @@ def execute_fn(conv: gr.State, history, code, exp_out, model, language, stream):
             )
     return [history, output, code] 
 
-def execute_fn_with_stream(conv: gr.State, history, code, exp_out, model, language, stream):
+def execute_fn_with_stream(
+    conv: gr.State, 
+    history, 
+    code, 
+    exp_out, 
+    model, 
+    language,
+    timeout,
+    stream,
+    temprature, 
+    top_p, 
+    top_k
+):
     data = json.dumps(
         {
             "script": code,
@@ -248,7 +312,13 @@ def execute_fn_with_stream(conv: gr.State, history, code, exp_out, model, langua
             "language": language,
             "expected_output": exp_out,
             "conv_id": conv.conv_id,
-            "stream": stream
+            "timeout": timeout,
+            "stream": stream,
+            "model_params": {
+                "temprature": temprature,
+                "top_p": top_p,
+                "top_k": top_k
+            }
         }
     )
     response = requests.post(
@@ -259,7 +329,7 @@ def execute_fn_with_stream(conv: gr.State, history, code, exp_out, model, langua
     flag = True
     for chunk in response.iter_lines():
         json_obj = json.loads(chunk)
-        if "error" in json_obj:
+        if json_obj["error"]:
             output = gr.Textbox(
                 value=json_obj["output"],
                 label=output_err_msg,
@@ -320,53 +390,16 @@ def execute_fn_with_stream(conv: gr.State, history, code, exp_out, model, langua
     history[-1][1] = history[-1][1].rstrip("▌")
     yield history, output, code
 
-def can_exec(conv, code):
-    if code != "" and conv.passed_security_scan:
-        return gr.Button(value="Approve and Execute", interactive=True)
-    else:
-        return gr.Button(value="Approve and Execute", interactive=False)
-
-    
-def change_language(language):
-    """
-    Code Languages
-    approved language: [('python', 'markdown', 'json', 'html', 'css', 'javascript', 'typescript', 'yaml', 'dockerfile', 'shell', 'r')]
-    """
-    return [ConvState(), []] + [gr.Code(value="", language=l_mapping[language], interactive=False)] + [""] * 2
-
-def change_model():
-    return [ConvState(), []] + [""] * 3
-
-def clear_fn():
-    return [ConvState(), [], "", ""] + [gr.Textbox(
-        value="",
-        label=output_info_msg, 
-        elem_id="--primary-50", 
-        interactive=False, 
-        show_copy_button=True, 
-        lines=15, 
-        max_lines=15
-    )] + [gr.Textbox(
-        value="",
-        label=sec_out_info_msg, 
-        elem_id="--primary-50", 
-        interactive=False, 
-        show_copy_button=True, 
-        lines=7, 
-        max_lines=7
-    )]
-
-def vote(data: gr.LikeData):
-    if data.liked:
-        print("You upvoted this response: " + data.value)
-    else:
-        print("You downvoted this response: " + data.value)   
-
-def add_text(message, history):
-    history += [[message, None]]
-    return ["", history]
-
-def generate_response_with_stream(conv: gr.State, history, model, language, stream): 
+def generate_response_with_stream(
+    conv: gr.State, 
+    history, 
+    model, 
+    language, 
+    stream,
+    temprature, 
+    top_p, 
+    top_k
+): 
 
     conv.passed_security_scan = False
     conv.scan_retries = 0
@@ -377,7 +410,12 @@ def generate_response_with_stream(conv: gr.State, history, model, language, stre
             "model_name": models_list[model]["model_name"], 
             "language": language,
             "conv_id": conv.conv_id,
-            "stream": stream
+            "stream": stream,
+            "model_params": {
+                "temprature": temprature,
+                "top_p": top_p,
+                "top_k": top_k
+            }
         }
     )
     response = requests.post(
@@ -427,7 +465,16 @@ def generate_response_with_stream(conv: gr.State, history, model, language, stre
         exp_out: json_obj.get("expected_output","")
     }
 
-def generate_response(conv: gr.State, history, model, language, stream): 
+def generate_response(
+    conv: gr.State, 
+    history, 
+    model, 
+    language, 
+    stream,
+    temprature, 
+    top_p, 
+    top_k
+): 
 
     conv.passed_security_scan = False
     conv.scan_retries = 0
@@ -438,7 +485,12 @@ def generate_response(conv: gr.State, history, model, language, stream):
             "model_name": models_list[model]["model_name"], 
             "language": language,
             "conv_id": conv.conv_id,
-            "stream": stream
+            "stream": stream,
+            "model_params": {
+                "temprature": temprature,
+                "top_p": top_p,
+                "top_k": top_k
+            }
         }
     )
     response = json.loads(
@@ -460,17 +512,113 @@ def generate_response(conv: gr.State, history, model, language, stream):
     history[-1][1] = json_obj["generated_text"]
     return [conv, history, res["script"], res["expected_output"]]
 
+def save_fn(
+    code,
+    language,
+    temprature, 
+    top_p, 
+    top_k
+):
+    prompt = task_store_prompt.format(**{"code": code})
+    data = json.dumps(
+        {
+            "prompt": prompt,
+            "model_family": "bedrock", 
+            "model_name": "anthropic.claude-instant-v1", 
+            "language": language,
+            "stream": False,
+            "model_params": {
+                "temprature": temprature,
+                "top_p": top_p,
+                "top_k": top_k,
+                "model_type": "Claude-TS"
+            }
+        }
+    )
+    response = json.loads(
+        requests.post(
+            "http://" + controller_url + "/generate",
+            data=data
+        ).text
+    )
+    
+    if "error" in response:
+        message = f'\nStack Trace: {response["stacktrace"]}' if "stacktrace" in response else ""
+        return None
+    
+    print(response)
+    print(response["generated_text"])
+    return None
+
+def can_exec(conv, code):
+    if code != "" and conv.passed_security_scan:
+        return (
+            gr.Button(value="Approve and Execute", interactive=True),
+            gr.Button(value="Save 💾️", interactive=True)
+        )
+    else:
+        return (
+            gr.Button(value="Approve and Execute", interactive=False),
+            gr.Button(value="Save 💾️", interactive=False)
+        )
+    
+def change_language(language):
+    """
+    Code Languages
+    approved language: [('python', 'markdown', 'json', 'html', 'css', 'javascript', 'typescript', 'yaml', 'dockerfile', 'shell', 'r')]
+    """
+    return [ConvState(), []] + [gr.Code(value="", language=l_mapping[language], interactive=False)] + [""] * 2
+
+def change_model():
+    return [ConvState(), []] + [""] * 3
+
+def clear_fn():
+    return [ConvState(), [], "", ""] + [gr.Textbox(
+        value="",
+        label=output_info_msg, 
+        elem_id="--primary-50", 
+        interactive=False, 
+        show_copy_button=True, 
+        lines=15, 
+        max_lines=15
+    )] + [gr.Textbox(
+        value="",
+        label=sec_out_info_msg, 
+        elem_id="--primary-50", 
+        interactive=False, 
+        show_copy_button=True, 
+        lines=7, 
+        max_lines=7
+    )]
+
+def vote(data: gr.LikeData, conv):
+    if data.liked:
+        print("You upvoted this response: " + data.value + conv.conv_id)
+    else:
+        print("You downvoted this response: " + data.value)   
+
+def add_text(message, history):
+    history += [[message, None]]
+    return ["", history]
+
+def disable_exec_btn():
+    return (
+        gr.Button(value="Approve and Execute", interactive=False),
+        gr.Button(value="Save 💾️", interactive=False)
+    )
 
 def web_ui():
     global state, chatbot, script, out, exp_out, scan_stat, sec_out
     with gr.Blocks(css=css, theme=gr.themes.Base(neutral_hue="slate")) as webUI:
         state = gr.State(ConvState())
         gr.Markdown(welcome_message)
+        with gr.Accordion(label="Instructions:", open=False):
+            gr.Markdown(instructions)
         with gr.Row(equal_height=True):
             with gr.Column(scale=5):
                 with gr.Group(elem_id="chatbot-group"):
                     with gr.Row():
-                        chatbot = gr.Chatbot(elem_id="chatbot-window", height=600)
+                        chatbot = gr.Chatbot(elem_id="chatbot-window", show_copy_button=True, height=600)
                     with gr.Row():
                         textbox = gr.Textbox(
                             show_label=False, 
@@ -496,14 +644,20 @@ def web_ui():
                         model = gr.Dropdown(models_list.keys(),label="Model Selection", value=list(models_list.keys())[0]) # Model Selection
                     scan_stat = gr.Markdown(scan_empty_msg)
                     script = gr.Code(value="",label="Script", language = l_mapping[languages[0]], interactive=False, lines=16)
-                    execute = gr.Button(value="Approve and Execute", interactive=False)
+                    with gr.Row():
+                        execute = gr.Button(value="Approve and Execute", interactive=False)
+                        save = gr.Button(value="Save 💾️", interactive=False)
         out = gr.Textbox(value="",label=output_info_msg, interactive=False, show_copy_button=True, lines=15, max_lines=15)
         with gr.Accordion(label="Other Outputs", open=False):
             exp_out = gr.Textbox(value="",label="Expected Output", interactive=False, lines=7, max_lines=7)
             sec_out = gr.Textbox(value="",label=sec_out_info_msg, interactive=False, lines=7, max_lines=7)
         with gr.Accordion(label="Parameters", open=False):
             streaming = gr.Checkbox(label='Stream chat response', value=True)
-            timeout = gr.Number(label="Timeout", precision=0, minimum=10, maximum=300, value=10)
+            timeout = gr.Number(label="Execution Timeout", precision=0, minimum=10, maximum=300, value=30)
+            temprature = gr.Slider(label="Temprature", step=0.1, minimum=0, maximum=1, value=0.1)
+            top_p = gr.Slider(label="Top_p", step=0.1, minimum=0, maximum=1, value=0.1)
+            top_k = gr.Slider(label="Top_k", step=1, minimum=1, maximum=500, value=5)
+            
             
         language.change(change_language, [language], [state, chatbot, script, out, exp_out], queue=False)
         model.change(change_model, None, [state, chatbot, script, out, exp_out], queue=False)
@@ -516,20 +670,25 @@ def web_ui():
             queue=False
         ).then(
             generate_response_with_stream if streaming.value else generate_response, 
-            [state, chatbot, model, language, streaming], 
+            [state, chatbot, model, language, streaming, temprature, top_p, top_k], 
             [state, chatbot, script, exp_out],
             show_progress=False,
             queue=streaming.value
         )
         script.change(
+        #     critique_fn_with_stream if streaming.value else critique_fn, 
+        #     [state, chatbot, script, scan_stat, exp_out, model, language, streaming, temprature, top_p, top_k], 
+        #     [state, chatbot, sec_out, script, scan_stat], queue=streaming,
+        #     show_progress=False
+        # ).then(
             scan_fn_with_stream if streaming.value else scan_fn, 
-            [state, chatbot, script, scan_stat, exp_out, model, language, streaming], 
+            [state, chatbot, script, scan_stat, exp_out, model, language, streaming, temprature, top_p, top_k], 
             [state, chatbot, sec_out, script, scan_stat], queue=streaming,
             show_progress=False
         ).then(
             can_exec, 
             [state, script], 
-            [execute],
+            [execute, save],
             show_progress=False,
             queue=False
         )
@@ -542,15 +701,25 @@ def web_ui():
             queue=False
         )
         execute.click(
+            disable_exec_btn,
+            None,
+            [execute, save]
+        ).then(
             execute_fn_with_stream if streaming.value else execute_fn, 
-            [state, chatbot, script, exp_out, model, language, streaming], 
+            [state, chatbot, script, exp_out, model, language, timeout, streaming, temprature, top_p, top_k], 
             [chatbot, out, script],
             show_progress=False,
             queue=streaming
         )
+        save.click(
+            save_fn, 
+            [script, language, temprature, top_p, top_k], 
+            None,
+            show_progress=False
+        )
         chatbot.like(
             vote, 
-            None, 
+            state, 
             None,
             show_progress=False,
             queue=False
