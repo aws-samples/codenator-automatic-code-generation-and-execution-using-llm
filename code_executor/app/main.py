@@ -47,8 +47,8 @@ async def execute_code(request: Request):
         if code_blob != "":
             code = decryptor.decrypt(code_blob)
             nb = JupyterNotebook(kernel_name=kernel_name)
-            out, error = nb.run_cell(code, timeout)            
-            return {"output": out, "error": error}
+            out, error, files = nb.run_cell(code, timeout)            
+            return {"output": out, "error": error, "files": files}
 
         # java? https://github.com/SpencerPark/IJava
         # bash script? https://pypi.org/project/bash_kernel/

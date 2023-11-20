@@ -28,7 +28,10 @@ RUN pip install bash_kernel && python -m bash_kernel.install
 
 USER jovyan
 
-WORKDIR /code
+WORKDIR /code/app
 COPY ./app /code/app
+RUN mkdir -p /code/app/tmp
+ENV MPLCONFIGDIR=/code/app/.cache
+RUN mkdir -p /code/app/.cache
 
 ENTRYPOINT ["python3", "/code/app/main.py"] 

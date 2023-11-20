@@ -102,19 +102,13 @@ class Conversation:
         return res
     
     def exec_script(self, script, expected_output, timeout=10):
-        output_res = ""
+        full_script = ""
         if utils.LANGUAGES[self.language]["pre_exec_script"]:
-            output_res += self.executor(
-                utils.LANGUAGES[self.language]["pre_exec_script"], 
-                utils.LANGUAGES[self.language]["kernel_name"]
-            )["output"]
-        res = self.executor(script, utils.LANGUAGES[self.language]["kernel_name"], timeout)
-        res["output"] = output_res + res["output"]
+            full_script += utils.LANGUAGES[self.language]["pre_exec_script"] + "\n"
+        full_script += script
         if utils.LANGUAGES[self.language]["post_exec_script"]:
-            res["output"] += self.executor(
-                utils.LANGUAGES[self.languages2]["post_exec_script"], 
-                utils.LANGUAGES[self.language]["kernel_name"]
-            )["output"]
+            full_script += "\n" + utils.LANGUAGES[self.language]["post_exec_script"]
+        res = self.executor(full_script, utils.LANGUAGES[self.language]["kernel_name"], timeout)
         res["script"] = script
         res["expected_output"] = expected_output
         res["conv_id"] = self.id

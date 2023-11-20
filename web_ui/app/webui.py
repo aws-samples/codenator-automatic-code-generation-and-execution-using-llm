@@ -1,8 +1,10 @@
 import gradio as gr
 import requests
 import json
+import base64
+import io
+import os
 from constants import (
-    controller_url,
     l_mapping,
     models_list,
     out_tag,
@@ -19,10 +21,13 @@ from constants import (
     scan_empty_msg,
     sec_out_err_msg,
     sec_out_info_msg,
-    task_store_prompt
+    task_store_prompt,
+    files_path
 )
 
 # Global
+languages = {}
+controller_url = ""
 
 class ConvState:
     def __init__(self):
@@ -77,70 +82,71 @@ def scan_fn_with_stream(
             )
             flag = True
             for chunk in response.iter_lines():
-                json_obj = json.loads(chunk)
-                if "error" in json_obj:
-                    message = f'\nStack Trace: {json_obj["stacktrace"]}' if "stacktrace" in json_obj else ""
-                    history[-1][1] = f'## ⛔️ **Agent encountered an error.**\n**Error:**{json_obj["error"]}{message}'
-                    conv = ConvState()
-                    yield {
-                        chatbot: history, 
-                        scan_stat: scan_empty_msg,
-                        sec_out:"",
-                        script: code
-                    }
-                    break
-                if "vulnerabilities" in json_obj and len(json_obj["vulnerabilities"]) > 0:
-                    # gr.Warning("Code security scan detected some issues.")
-                    output = gr.Textbox(
-                        value=json_obj["vulnerabilities"],
-                        label=sec_out_err_msg, 
-                        elem_id="red",
-                        lines=7,
-                        max_lines=7
-                    )
-                    code = json_obj["script"]
-                    
-                    scan_status = scan_fail_msg
-                    if flag:
-                        history.append(
-                            [
-                                "Securit scan produced shown recommendations.",
-                                # to avoid Gradio Markdown bug related to <output></output> bug
-                                (
-                                    json_obj["generated_text"] + "▌"
-                                ).replace(
-                                    out_tag[0], 
-                                    ex_out_tag[0]
-                                ).replace(
-                                    out_tag[1], 
-                                    ex_out_tag[1]
-                                )
-                            ]
+                if chunk != b'':
+                    json_obj = json.loads(chunk)
+                    if "error" in json_obj:
+                        message = f'\nStack Trace: {json_obj["stacktrace"]}' if "stacktrace" in json_obj else ""
+                        history[-1][1] = f'## ⛔️ **Agent encountered an error.**\n**Error:**{json_obj["error"]}{message}'
+                        conv = ConvState()
+                        yield {
+                            chatbot: history, 
+                            scan_stat: scan_empty_msg,
+                            sec_out:"",
+                            script: code
+                        }
+                        break
+                    if "vulnerabilities" in json_obj and len(json_obj["vulnerabilities"]) > 0:
+                        # gr.Warning("Code security scan detected some issues.")
+                        output = gr.Textbox(
+                            value=json_obj["vulnerabilities"],
+                            label=sec_out_err_msg, 
+                            elem_id="red",
+                            lines=7,
+                            max_lines=7
                         )
-                        conv.scan_retries += 1
-                        flag = False
+                        code = json_obj["script"]
+
+                        scan_status = scan_fail_msg
+                        if flag:
+                            history.append(
+                                [
+                                    "Securit scan produced shown recommendations.",
+                                    # to avoid Gradio Markdown bug related to <output></output> bug
+                                    (
+                                        json_obj["generated_text"] + "▌"
+                                    ).replace(
+                                        out_tag[0], 
+                                        ex_out_tag[0]
+                                    ).replace(
+                                        out_tag[1], 
+                                        ex_out_tag[1]
+                                    )
+                                ]
+                            )
+                            conv.scan_retries += 1
+                            flag = False
+                        else:
+                            history[-1][-1] = (
+                                json_obj["generated_text"] + "▌"
+                            ).replace(
+                                out_tag[0], 
+                                ex_out_tag[0]
+                            ).replace(
+                                out_tag[1], 
+                                ex_out_tag[1]
+                            )
+                        yield {
+                            state: conv,
+                            chatbot: history,
+                            sec_out: output
+                        }
                     else:
-                        history[-1][-1] = (
-                            json_obj["generated_text"] + "▌"
-                        ).replace(
-                            out_tag[0], 
-                            ex_out_tag[0]
-                        ).replace(
-                            out_tag[1], 
-                            ex_out_tag[1]
-                        )
-                    yield {
-                        state: conv,
-                        chatbot: history,
-                        sec_out: output
-                    }
-                else:
-                    scan_status = scan_pass_msg
-                    conv.scan_retries = 0
-                    conv.passed_security_scan = True
-                    yield {
-                        state: conv
-                    }            
+                        scan_status = scan_pass_msg
+                        conv.scan_retries = 0
+                        conv.passed_security_scan = True
+                        yield {
+                            state: conv
+                        }            
             history[-1][1] = history[-1][1].rstrip("▌")
     ret = {
         chatbot: history, 
@@ -289,7 +295,15 @@ def execute_fn(
                 lines=15,
                 max_lines=15
             )
-    return [history, output, code] 
+    images = []
+    if "files" in json_obj:
+        for file in json_obj["files"]:
+            file_name, content = file.values()
+            image_content = base64.b64decode(content)
+            with open(os.path.join(files_path, file_name), "wb") as img:
+                img.write(image_content)
+            images.append(os.path.join(files_path, file_name))
+    return [history, output, code, images] 
 
 def execute_fn_with_stream(
     conv: gr.State, 
@@ -326,69 +340,78 @@ def execute_fn_with_stream(
         data=data,
         stream=stream
     )
+    images = []
     flag = True
     for chunk in response.iter_lines():
-        json_obj = json.loads(chunk)
-        if json_obj["error"]:
-            output = gr.Textbox(
-                value=json_obj["output"],
-                label=output_err_msg,
-                elem_id="red",
-                lines=15,
-                max_lines=15
-            )
-            if flag:
-                history.append(
-                    [
-                        "The script failed with shown error message",
-                        # to avoid Gradio Markdown bug related to <output></output> bug
-                        (
-                            json_obj["generated_text"] + "▌"
-                        ).replace(
-                            out_tag[0], 
-                            ex_out_tag[0]
-                        ).replace(
-                            out_tag[1], 
-                            ex_out_tag[1]
-                        )
-                    ]
-                )
-                flag = False
-            else:
-                history[-1][-1] = (
-                    json_obj["generated_text"] + "▌"
-                ).replace(
-                    out_tag[0], 
-                    ex_out_tag[0]
-                ).replace(
-                    out_tag[1], 
-                    ex_out_tag[1]
-                )
-            code = json_obj["script"]
-        else:
-            if json_obj["output"] != exp_out:
+        if chunk != b'':
+            json_obj = json.loads(chunk)
+            if "files" in json_obj:
+                for file in json_obj["files"]:
+                    file_name, content = file.values()
+                    image_content = base64.b64decode(content)
+                    with open(os.path.join(files_path, file_name), "wb") as img:
+                        img.write(image_content)
+                    images.append(os.path.join(files_path, file_name))
+            if json_obj["error"]:
                 output = gr.Textbox(
                     value=json_obj["output"],
-                    label=output_wrn_msg, 
-                    elem_id="amber", 
-                    interactive=False, 
-                    show_copy_button=True, 
+                    label=output_err_msg,
+                    elem_id="red",
                     lines=15,
                     max_lines=15
                 )
+                if flag:
+                    history.append(
+                        [
+                            "The script failed with shown error message",
+                            # to avoid Gradio Markdown bug related to <output></output> bug
+                            (
+                                json_obj["generated_text"] + "▌"
+                            ).replace(
+                                out_tag[0], 
+                                ex_out_tag[0]
+                            ).replace(
+                                out_tag[1], 
+                                ex_out_tag[1]
+                            )
+                        ]
+                    )
+                    flag = False
+                else:
+                    history[-1][-1] = (
+                        json_obj["generated_text"] + "▌"
+                    ).replace(
+                        out_tag[0], 
+                        ex_out_tag[0]
+                    ).replace(
+                        out_tag[1], 
+                        ex_out_tag[1]
+                    )
+                code = json_obj["script"]
             else:
-                output = gr.Textbox(
-                    value=json_obj["output"],
-                    label=output_info_msg, 
-                    elem_id="--primary-50", 
-                    interactive=False, 
-                    show_copy_button=True,
-                    lines=15,
-                    max_lines=15
-                )
-        yield [history, output, code]
+                if json_obj["output"] != exp_out:
+                    output = gr.Textbox(
+                        value=json_obj["output"],
+                        label=output_wrn_msg, 
+                        elem_id="amber", 
+                        interactive=False, 
+                        show_copy_button=True, 
+                        lines=15,
+                        max_lines=15
+                    )
+                else:
+                    output = gr.Textbox(
+                        value=json_obj["output"],
+                        label=output_info_msg, 
+                        elem_id="--primary-50", 
+                        interactive=False, 
+                        show_copy_button=True,
+                        lines=15,
+                        max_lines=15
+                    )
+            yield [history, output, code, images]
     history[-1][1] = history[-1][1].rstrip("▌")
-    yield history, output, code
+    yield history, output, code, images
 
 def generate_response_with_stream(
     conv: gr.State, 
@@ -425,33 +448,34 @@ def generate_response_with_stream(
     )
     
     for chunk in response.iter_lines():
-        json_obj = json.loads(chunk)
-        if "error" in json_obj:
-            message = f'\nStack Trace: {json_obj["stacktrace"]}' if "stacktrace" in json_obj else ""
-            history[-1][1] = f'## ⛔️ **Agent encountered an error.**\n**Error:** {json_obj["error"]}{message}'
-            conv = ConvState()
+        if chunk != b'':
+            json_obj = json.loads(chunk)
+            if "error" in json_obj:
+                message = f'\nStack Trace: {json_obj["stacktrace"]}' if "stacktrace" in json_obj else ""
+                history[-1][1] = f'## ⛔️ **Agent encountered an error.**\n**Error:** {json_obj["error"]}{message}'
+                conv = ConvState()
+                yield {
+                    state: conv,
+                    chatbot: history,
+                    script: "",
+                    exp_out: ""
+                }
+                break
+            # to avoid Gradio Markdown bug related to <output></output> bug
+            history[-1][1] = (
+                json_obj["generated_text"] + "▌"
+            ).replace(
+                out_tag[0], 
+                ex_out_tag[0]
+            ).replace(
+                out_tag[1], 
+                ex_out_tag[1]
+            )
+            conv.conv_id = json_obj.get("conv_id", "")
             yield {
                 state: conv,
-                chatbot: history,
-                script: "",
-                exp_out: ""
+                chatbot: history
             }
-            break
-        # to avoid Gradio Markdown bug related to <output></output> bug
-        history[-1][1] = (
-            json_obj["generated_text"] + "▌"
-        ).replace(
-            out_tag[0], 
-            ex_out_tag[0]
-        ).replace(
-            out_tag[1], 
-            ex_out_tag[1]
-        )
-        conv.conv_id = json_obj.get("conv_id", "")
-        yield {
-            state: conv,
-            chatbot: history
-        }
     
     last_response = history[-1][1].rstrip("▌")
     
@@ -499,7 +523,6 @@ def generate_response(
             data=data
         ).text
     )
-    
     if "error" in response:
         message = f'\nStack Trace: {response["stacktrace"]}' if "stacktrace" in response else ""
         history[-1][1] = f'## ⛔️ **Agent encountered an error.**\n**Error:**{response["error"]}{message}'
@@ -519,7 +542,7 @@ def save_fn(
     top_p, 
     top_k
 ):
-    prompt = task_store_prompt.format(**{"code": code})
+    prompt = task_store_prompt.replace("{code}", code)
     data = json.dumps(
         {
             "prompt": prompt,
@@ -545,8 +568,7 @@ def save_fn(
     if "error" in response:
         message = f'\nStack Trace: {response["stacktrace"]}' if "stacktrace" in response else ""
         return None
-    
-    print(response)
+
     print(response["generated_text"])
     return None
 
@@ -562,17 +584,27 @@ def can_exec(conv, code):
             gr.Button(value="Save 💾️", interactive=False)
         )
     
+def empty_folder():
+    files = os.listdir(files_path)
+    for file in files:
+        file_path = os.path.join(files_path, file)
+        if os.path.isfile(file_path):
+            os.remove(file_path)
+    
 def change_language(language):
     """
     Code Languages
     approved language: [('python', 'markdown', 'json', 'html', 'css', 'javascript', 'typescript', 'yaml', 'dockerfile', 'shell', 'r')]
     """
-    return [ConvState(), []] + [gr.Code(value="", language=l_mapping[language], interactive=False)] + [""] * 2
+    empty_folder()
+    return [ConvState(), []] + [gr.Code(value="", language=l_mapping[language], interactive=False)] + [""] * 2 + [[]]
 
 def change_model():
-    return [ConvState(), []] + [""] * 3
+    empty_folder()
+    return [ConvState(), []] + [""] * 3 + [[]]
 
 def clear_fn():
+    empty_folder()
     return [ConvState(), [], "", ""] + [gr.Textbox(
         value="",
         label=output_info_msg, 
@@ -581,7 +613,7 @@ def clear_fn():
         show_copy_button=True, 
         lines=15, 
         max_lines=15
-    )] + [gr.Textbox(
+    )] + [[]] + [gr.Textbox(
         value="",
         label=sec_out_info_msg, 
         elem_id="--primary-50", 
@@ -637,6 +669,7 @@ def web_ui():
                             scale=1, 
                             elem_id="chatbot-button"
                         )
+                out = gr.Textbox(value="",label=output_info_msg, interactive=False, show_copy_button=True, lines=15, max_lines=15)
             with gr.Column(scale=3):
                 with gr.Group(elem_id="script-group"):
                     with gr.Row():
@@ -647,20 +680,21 @@ def web_ui():
                     with gr.Row():
                         execute = gr.Button(value="Approve and Execute", interactive=False)
                         save = gr.Button(value="Save 💾️", interactive=False)
-        out = gr.Textbox(value="",label=output_info_msg, interactive=False, show_copy_button=True, lines=15, max_lines=15)
+                image = gr.Gallery(label="Image", show_download_button=True, preview=True, object_fit="fill", selected_index=0)
+        
         with gr.Accordion(label="Other Outputs", open=False):
             exp_out = gr.Textbox(value="",label="Expected Output", interactive=False, lines=7, max_lines=7)
             sec_out = gr.Textbox(value="",label=sec_out_info_msg, interactive=False, lines=7, max_lines=7)
         with gr.Accordion(label="Parameters", open=False):
             streaming = gr.Checkbox(label='Stream chat response', value=True)
-            timeout = gr.Number(label="Execution Timeout", precision=0, minimum=10, maximum=300, value=30)
+            timeout = gr.Number(label="Execution Timeout", precision=0, minimum=10, maximum=3600, value=30)
             temprature = gr.Slider(label="Temprature", step=0.1, minimum=0, maximum=1, value=0.1)
             top_p = gr.Slider(label="Top_p", step=0.1, minimum=0, maximum=1, value=0.1)
             top_k = gr.Slider(label="Top_k", step=1, minimum=1, maximum=500, value=5)
             
             
-        language.change(change_language, [language], [state, chatbot, script, out, exp_out], queue=False)
-        model.change(change_model, None, [state, chatbot, script, out, exp_out], queue=False)
+        language.change(change_language, [language], [state, chatbot, script, out, exp_out, image], queue=False)
+        model.change(change_model, None, [state, chatbot, script, out, exp_out, image], queue=False)
         gr.on(
             [submit.click, textbox.submit],
             add_text, 
@@ -696,7 +730,7 @@ def web_ui():
         clear_btn.click(
             clear_fn, 
             None, 
-            [state, chatbot, script, exp_out, out, sec_out],
+            [state, chatbot, script, exp_out, out, image, sec_out],
             show_progress=False,
             queue=False
         )
@@ -707,7 +741,7 @@ def web_ui():
         ).then(
             execute_fn_with_stream if streaming.value else execute_fn, 
             [state, chatbot, script, exp_out, model, language, timeout, streaming, temprature, top_p, top_k], 
-            [chatbot, out, script],
+            [chatbot, out, script, image],
             show_progress=False,
             queue=streaming
         )
@@ -729,9 +763,7 @@ def web_ui():
 def get_languages_list(url):
     return list(json.loads(requests.get("http://" + url + "/list_languages").json()).keys())
     
-if __name__ == "__main__":    
+if __name__ == "__main__":
     languages = get_languages_list(controller_url)
     UI = web_ui()
-    UI.queue(status_update_rate=10, api_open=False).launch(debug=True, max_threads=200)
-
-    # create events, when chaning model/language selection, it will clear the chat history, scirpt, expected output and output
+    UI.queue(status_update_rate=10, api_open=False).launch(debug=False, max_threads=200)

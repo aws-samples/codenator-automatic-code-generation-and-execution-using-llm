@@ -2,6 +2,10 @@ from jupyter_client import KernelManager, run_kernel
 from jupyter_client.kernelspec import KernelSpecManager
 import threading
 import re
+import os
+import base64
+
+files_path = "tmp/"
 
 class JupyterKernels:
     def __init__(self):
@@ -32,6 +36,18 @@ class JupyterNotebook:
                 outputs_only_str.append(error_msg)
 
         return "\n".join(outputs_only_str).strip()
+    
+    def get_files(self):
+        files = os.listdir(files_path)
+        content = []
+        for file in files:
+            file_path = os.path.join(files_path, file)
+            if os.path.isfile(file_path):
+                with open(file_path, "rb") as image_file:
+                    encoded_string = base64.b64encode(image_file.read())
+                    content.append({"file": file, "content": encoded_string.decode()})
+                os.remove(file_path)
+        return content
 
     def run_cell(self, code_string, timeout=10):
         # Execute the code and get the execution count
@@ -61,4 +77,4 @@ class JupyterNotebook:
             except:
                 break
 
-        return self.clean_output(outputs), error_flag
+        return self.clean_output(outputs), error_flag, self.get_files()

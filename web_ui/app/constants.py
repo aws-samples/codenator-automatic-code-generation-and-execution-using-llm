@@ -1,5 +1,3 @@
-controller_url = "internal-codenator-899847730.us-west-2.elb.amazonaws.com" + ":8012"
-
 l_mapping = {
     "Bash":"shell", 
     "Python":"python", 
@@ -29,7 +27,20 @@ models_list = {
         "model_name": "llama2js.jumpstart-dft-meta-textgeneration-llama-2-13b"
     }
 }
-task_store_prompt = "What would I say for you to generate the below code for me? Your answer must be a command sentence and complete to ensure identical code generation. Do not respond with code or mention package names. Avoid using please or showing emotions.\n```\n{code}\n```"
+task_store_prompt = """ You are an expert programmer that helps me understand code.
+You will be tasked to formulate a command sentence that describes the code.
+You should only respond in JSON format as described below:
+{
+    "body": "Your response here",
+    "reasoning": "Explain your reasoning here"
+}
+Ensure the response can be parsed by Python `json.loads`, e.g.: no trailing commas, no single quotes, etc.
+
+What would I say for you to produce the below code for me? Your answer must be a command sentence and complete to ensure identical code generation. Do not respond with code or mention package names. Avoid using please or showing emotions.
+```
+{code}
+```
+"""
 out_tag = ["<output>", "/output>"]
 ex_out_tag = ["<expected_output>", "/expected_output>"]
 max_security_scan_retries = 3
@@ -58,6 +69,24 @@ css = """
 .codemirror-wrapper .cm-editor .cm-scroller{
  min-height:457px;
 }
+/* Image */
+.contain .gap img{
+ height:362px;
+}
+/* Unpadded box */
+gradio-app .gradio-container .main .wrap .contain .gap .stretch .gap .block .unpadded_box{
+ height:362px !important;
+}
+/* Preview */
+.contain .gap .preview{
+ height:362px !important;
+}
+
+/* Grid wrap */
+.contain .gap .grid-wrap{
+ min-height:3px !important;
+ height:362px !important;
+}
 """
 welcome_message="""
 # Welcome to Codenator 🤖️
@@ -82,3 +111,4 @@ scan_pass_msg = "🔍️ Code Security scan status: ✅️"
 scan_empty_msg = "🔍️ Code Security scan status: None"
 sec_out_err_msg = "Security Scan Output: ❌️ ERROR ❌️"
 sec_out_info_msg = "Security Scan Output:"
+files_path = "tmp"
