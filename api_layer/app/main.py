@@ -1,16 +1,46 @@
 from importlib import import_module
 import argparse
 import json
-import logging as logger
+import logging
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
 from handlers import base
 import traceback
-
+from typing import Dict, Any
 import uvicorn
+import boto3
+import sys
+import os
+import time
 
+global logger
+
+app = FastAPI(title='api-layer')
+logger = logging.getLogger(__name__)
+log_level = logging.DEBUG if os.environ["APP_LOG_LEVEL"].upper() == "DEBUG" else logging.INFO
+logger.setLevel(log_level)
+logger.addHandler(logging.StreamHandler(sys.stdout))
 app = FastAPI()
 
+def publish_metrics(latency) -> None:
+    cw_client = boto3.client("cloudwatch")
+    namespace = os.getenv("CW_NAMESPACE", "Codenator/api-layer/")
+    logger.debug(f"Publishing CW metrics (Namespace: {namespace})")
+    cw_client.put_metric_data(
+        Namespace=namespace,
+        MetricData=[
+            {
+                'MetricName': "invocations",
+                'Value': 1,
+                'Unit': 'Count'
+            },
+            {
+                'MetricName': "latency",
+                'Value': latency,
+                'Unit': 'Count'
+            }
+        ]
+    )
 
 # health check
 @app.get("/ping")
@@ -46,18 +76,27 @@ def list_models():
 
 
 @app.post("/invoke")
-async def invoke(request: Request):
-    params = await request.json()
+def invoke(request: Dict[Any, Any]):
+    start = time.perf_counter()
+    params = request
+    req_params = [
+        "model_family",
+        "model_name"
+    ]
+    for req_param in req_params:
+        if req_param not in params:
+            return {"error": f"Request must contain [{req_param}] parameter."}
     model_family = params.get("model_family")
     model_name = params.get("model_name")
     body = params.get("body")
-    if not (model_family and model_name and body):
-        raise
     try:
         invoke_model = import_module(
             "handlers." + model_family
         ).model(model_name).invoke
-        return invoke_model(body)
+        ret = invoke_model(body)
+        latency = int((time.perf_counter() - start) * 1000)
+        publish_metrics(latency)
+        return ret
 
     except Exception as e:
         # Handle any exceptions that occur during execution
@@ -65,7 +104,7 @@ async def invoke(request: Request):
         return {"error": f"An error occurred: {str(e)}", "stacktrace": tb }
 
 
-async def invoke_with_response_stream(stream_response):
+def invoke_with_response_stream(stream_response):
     try:
         for next_item in stream_response:
             # if "generated_text"  in next_item and next_item["generated_text"] != "<EOS_TOKEN>":
@@ -77,23 +116,33 @@ async def invoke_with_response_stream(stream_response):
 
 
 @app.post("/invoke_stream")
-async def invoke_stream(request: Request):
-    params = await request.json()
+def invoke_stream(request: Dict[Any, Any]):
+    start = time.perf_counter()
+    params = request
+    req_params = [
+        "model_family",
+        "model_name"
+    ]
+    for req_param in req_params:
+        if req_param not in params:
+            return {"error": f"Request must contain [{req_param}] parameter."}
     model_family = params.get("model_family")
     model_name = params.get("model_name")
     body = params.get("body")
-    if not (model_family and model_name and body):
-        raise
     try:
         invoke_model = import_module(
             "handlers." + model_family
         ).model(model_name).invoke_with_response_stream
-        return StreamingResponse(
+        ret = StreamingResponse(
             invoke_with_response_stream(
                 invoke_model(body)
             ),
             media_type="application/x-ndjson"
         )
+        latency = int((time.perf_counter() - start) * 1000)
+        publish_metrics(latency)
+        return ret
+    
     except Exception as e:
         # Handle any exceptions that occur during execution
         tb = traceback.format_exc()
@@ -105,7 +154,10 @@ if __name__ == "__main__":
     parser.add_argument("--host", type=str, default="localhost")
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--table-name", type=str, default="")
+    parser.add_argument("--workers", type=int, default=3)
+    parser.add_argument("--namespace", type=str, default="Codenator/api-layer/")
     args = parser.parse_args()
+    os.environ["CW_NAMESPACE"] = args.namespace
     base.table_name = args.table_name
     logger.info(f"args: {args}")
-    uvicorn.run(app, host=args.host, port=args.port, log_level="info")
+    uvicorn.run("main:app", host=args.host, port=args.port, workers=args.workers, log_level="info")
