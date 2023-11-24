@@ -5,8 +5,6 @@ import base64
 import io
 import os
 from constants import (
-    l_mapping,
-    models_list,
     out_tag,
     ex_out_tag,
     max_security_scan_retries,
@@ -28,6 +26,8 @@ from constants import (
 # Global
 languages = {}
 controller_url = ""
+models_list = {}
+l_mapping ={}
 
 class ConvState:
     def __init__(self):

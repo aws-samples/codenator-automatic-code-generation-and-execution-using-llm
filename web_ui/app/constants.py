@@ -1,32 +1,3 @@
-l_mapping = {
-    "Bash":"shell", 
-    "Python":"python", 
-    "Java":"javascript",
-    "JavaScript":"javascript", 
-    "R":"r"
-}
-models_list = {
-    "Claude-v2": {
-        "model_family": "bedrock",
-        "model_name": "anthropic.claude-v2"
-    },
-    "Claude-v1": {
-        "model_family": "bedrock",
-        "model_name": "anthropic.claude-v1"
-    },
-    "Claude-instant-v1": {
-        "model_family": "bedrock",
-        "model_name": "anthropic.claude-instant-v1"
-    },
-    "Mistral7b-instruct": {
-        "model_family": "sagemaker",
-        "model_name": "tgi.jumpstart-dft-hf-llm-mistral-7b-instruct"
-    },
-    "Llama13b": {
-        "model_family": "sagemaker",
-        "model_name": "llama2js.jumpstart-dft-meta-textgeneration-llama-2-13b"
-    }
-}
 task_store_prompt = """ You are an expert programmer that helps me understand code.
 You will be tasked to formulate a command sentence that describes the code.
 You should only respond in JSON format as described below:
