@@ -8,6 +8,7 @@ from scanners.semgrep import SemgrepScanner
 from scanners.codeguru import CodeGuruScanner
 import traceback
 import time
+import os
 
 app = FastAPI()
 
@@ -18,7 +19,7 @@ scanners = {
 
 def publish_metrics(latency) -> None:
     cw_client = boto3.client("cloudwatch")
-    namespace = os.getenv("CW_NAMESPACE", "Codenator/api-layer/")
+    namespace = os.getenv("CW_NAMESPACE", "Codenator/code-scanner/")
     logger.debug(f"Publishing CW metrics (Namespace: {namespace})")
     cw_client.put_metric_data(
         Namespace=namespace,

@@ -2,7 +2,7 @@ import os
 import io
 import json
 import boto3
-from handlers.base import BaseModel, table_name
+from handlers.base import BaseModel
 import logging as logger
 import traceback
 
@@ -37,8 +37,8 @@ class StreamIterator:
 
 
 class model(BaseModel):
-    def __init__(self, model_name):
-        super().__init__()
+    def __init__(self, model_name, table_name):
+        super().__init__(table_name)
         self.endpoint_name = model_name.split(".")[1]
         self.container_type = model_name.split(".")[0]
         self.sagemaker_client = boto3.client(
@@ -47,7 +47,7 @@ class model(BaseModel):
         self.invoke_api = self.sagemaker_client.invoke_endpoint
         self.invoke_api_with_response_stream = self.sagemaker_client.invoke_endpoint_with_response_stream
         self.stream_iter = StreamIterator
-        if table_name == "":
+        if self.table_name == "":
             schema_path = f"handlers/schemas/sagemaker-{self.container_type}.json"
             if not os.path.exists(schema_path):
                 raise NotImplementedError(

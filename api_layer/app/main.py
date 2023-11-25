@@ -2,9 +2,9 @@ from importlib import import_module
 import argparse
 import json
 import logging
+from handlers import base
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
-from handlers import base
 import traceback
 from typing import Dict, Any
 import uvicorn
@@ -50,14 +50,15 @@ def ping():
 @app.get("/list_models")
 def list_models():
     try:
-        if base.table_name == "":
+        table_name = os.getenv("APP_TABLE_NAME", "")
+        if table_name == "":
             all_models_file_path = "handlers/schemas/all-models.json"
             with open(all_models_file_path, "r") as all_models_file:
                 all_models = json.load(all_models_file)
                 return {"models": all_models}
         else:
             all_models = base.ddb_client.get_item(
-                TableName=base.table_name,
+                TableName=table_name,
                 Key={
                     "pk": {
                         "S": "models"
@@ -76,6 +77,7 @@ def list_models():
 
 @app.post("/invoke")
 def invoke(request: Dict[Any, Any]):
+    table_name = os.getenv("APP_TABLE_NAME", "")
     start = time.perf_counter()
     params = request
     req_params = [
@@ -91,7 +93,7 @@ def invoke(request: Dict[Any, Any]):
     try:
         invoke_model = import_module(
             "handlers." + model_family
-        ).model(model_name).invoke
+        ).model(model_name, table_name).invoke
         ret = invoke_model(body)
         latency = int((time.perf_counter() - start) * 1000)
         publish_metrics(latency)
@@ -116,6 +118,7 @@ def invoke_with_response_stream(stream_response):
 
 @app.post("/invoke_stream")
 def invoke_stream(request: Dict[Any, Any]):
+    table_name = os.getenv("APP_TABLE_NAME", "")
     start = time.perf_counter()
     params = request
     req_params = [
@@ -131,7 +134,7 @@ def invoke_stream(request: Dict[Any, Any]):
     try:
         invoke_model = import_module(
             "handlers." + model_family
-        ).model(model_name).invoke_with_response_stream
+        ).model(model_name, table_name).invoke_with_response_stream
         ret = StreamingResponse(
             invoke_with_response_stream(
                 invoke_model(body)
@@ -157,6 +160,6 @@ if __name__ == "__main__":
     parser.add_argument("--namespace", type=str, default="Codenator/api-layer/")
     args = parser.parse_args()
     os.environ["CW_NAMESPACE"] = args.namespace
-    base.table_name = args.table_name
+    os.environ["APP_TABLE_NAME"] = args.table_name
     logger.info(f"args: {args}")
     uvicorn.run("main:app", host=args.host, port=args.port, workers=args.workers, log_level="info")

@@ -3,22 +3,24 @@ from jsonpath_ng import jsonpath, parse
 import re
 import boto3
 
-table_name = ""
 ddb_client = boto3.client("dynamodb")
 
 
 class BaseModel:
+    def __init__(self, table_name):
+        self.table_name = table_name
+        
     def inovke_api(self):
         raise NotImplementedError("Not implemented in base model, make sure to override this method.")
 
     def load_mappings(self, schema_path):
         mappings = {}
-        if table_name == "":
+        if self.table_name == "":
             with open(schema_path, "r") as schema_file:
                 mappings = json.load(schema_file)
         else:
             schema = ddb_client.get_item(
-                TableName=table_name,
+                TableName=self.table_name,
                 Key={
                     "pk": {
                         "S": "models"
