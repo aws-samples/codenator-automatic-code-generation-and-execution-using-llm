@@ -15,12 +15,11 @@ import time
 
 global logger
 
-app = FastAPI(title='api-layer')
 logger = logging.getLogger(__name__)
 log_level = logging.DEBUG if os.environ["APP_LOG_LEVEL"].upper() == "DEBUG" else logging.INFO
 logger.setLevel(log_level)
 logger.addHandler(logging.StreamHandler(sys.stdout))
-app = FastAPI()
+app = FastAPI(title='api-layer')
 
 def publish_metrics(latency) -> None:
     cw_client = boto3.client("cloudwatch")
