@@ -1,24 +1,41 @@
 from opensearchpy import OpenSearch, AWSV4SignerAuth, RequestsHttpConnection
+from store.base import BaseStore
+from utils import Euclidean_distance, cosine_similarity
 import boto3
+import os
 
-class AmazonOpenSearchServerless(BaseStore):
-    def __init__(self, index, region:str , endpoint: str):
-        self.index = index
+scoring = {
+    "Euclidean": Euclidean_distance,
+    "Cosine": cosine_similarity
+}
+
+class AOSSStore(BaseStore):
+    def __init__(self, similarity="Cosine"):
+        super().__init__()
         credentials = boto3.Session().get_credentials()
-        auth = AWSV4SignerAuth(credentials, region, service="aoss")
+        auth = AWSV4SignerAuth(credentials, self.region, service="aoss")
         self.client = OpenSearch(
-            hosts=[{"host": endpoint, "port": 443}],
+            hosts=[{"host": self.endpoint, "port": 443}],
             http_auth=auth,
             use_ssl=True,
             verify_certs=True,
             connection_class=RequestsHttpConnection,
         )
+        self.scorer = scoring[similarity]
+    
+    def get_config(self):
+        return {
+            "index": os.getenv("AOSS_INDEX", ""),
+            "region": os.getenv("AWS_REGION", "us-east-1"),
+            "endpoint": os.getenv("AOSS_ENDPOINT", "")
+        }
 
-    def save(self, embedding, task_desc, code):
+    def save(self, embedding, task_desc, code, language):
         task = {
-          "embedding": embedding,
-          "task_desc": task_desc,
-          "code": code
+            "embedding": embedding,
+            "task_desc": task_desc,
+            "code": code,
+            "language": language
         }
 
         response = self.client.index(
@@ -28,7 +45,7 @@ class AmazonOpenSearchServerless(BaseStore):
 
         return True if response.get("result") == "created" else False
     
-    def search(self, embedding, limit=1):
+    def search(self, embedding, threshold=0.1, limit=1):
         query = {
           "size": limit,
           "query": {
@@ -50,7 +67,9 @@ class AmazonOpenSearchServerless(BaseStore):
             return []
         results = []
         for hit in hits.get("hits"):
-            results.append(hit.get("_source"))
+            res_embedding = hit.get("_source")["embedding"]
+            if self.scorer(embedding, res_embedding) <= threshold:
+                results.append(hit.get("_source"))
                         
         return  results
     
