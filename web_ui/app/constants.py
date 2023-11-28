@@ -7,7 +7,8 @@ css = """
 #amber {background-color: #FFD966}
 /* Gradio container */
 gradio-app .gradio-container{
- max-width:2240px !important;
+ max-width:90% !important;
+ width:90% !important;
  transform:translatex(0px) translatey(0px);
 }
 
@@ -15,26 +16,36 @@ gradio-app .gradio-container{
 #script-group{
  transform:translatex(0px) translatey(0px);
  overflow:visible;
- min-height:643px;
- height:643px;
+ min-height:493px;
+ height:493px;
 }
 
 /* Styler */
 #script-group .styler{
- min-height:643px;
- height:643px;
+ min-height:493px;
+ height:493px;
 }
 
 /* Unpadded box */
 #script-group .block .unpadded_box{
- height:546px;
- min-height:546px;
- max-height:546px;
+ height:396px;
+ min-height:396px;
+ max-height:396px;
 }
 
 /* Unpadded box */
 .contain .gap .unpadded_box{
- min-height:362px !important;
+ min-height:301px !important;
+}
+/* Preview */
+.contain .gap .preview{
+ max-height:301px;
+}
+
+/* Grid wrap */
+.contain .gap .grid-wrap{
+ max-height:301px !important;
+ min-height:301px !important;
 }
 /* Min */
 #script-group .styler .min{
@@ -45,9 +56,28 @@ gradio-app .gradio-container{
 
 /* Scroller */
 .codemirror-wrapper .cm-editor .cm-scroller{
- height:547px;
- min-height:547px;
- max-height:547px;
+ height:397px;
+ min-height:397px;
+ max-height:397px;
+}
+/* Primary */
+#script-group .styler .primary{
+ min-width:80px;
+}
+
+/* Primary */
+gradio-app .gradio-container .main .wrap .contain .gap .stretch .gap .stretch .gap #script-group .styler .stretch .primary{
+ width:80px !important;
+}
+
+/* Secondary */
+#script-group .styler .secondary{
+ min-width:100px;
+}
+
+/* Secondary */
+gradio-app .gradio-container .main .wrap .contain .gap .stretch .gap .stretch .gap #script-group .styler .stretch .secondary{
+ width:100px !important;
 }
 """
 welcome_message="""

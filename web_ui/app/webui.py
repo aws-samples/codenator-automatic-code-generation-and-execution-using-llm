@@ -268,8 +268,8 @@ def execute_fn(
             value=response["output"],
             label=output_err_msg,
             elem_id="red",
-            lines=15,
-            max_lines=15
+            lines=12,
+            max_lines=12
         )
         history.append(["The script failed with shown error message", response["generated_text"]])
         code = response["script"]
@@ -281,8 +281,8 @@ def execute_fn(
                 elem_id="amber", 
                 interactive=False, 
                 show_copy_button=True, 
-                lines=15,
-                max_lines=15
+                lines=12,
+                max_lines=12
             )
         else:
             output = gr.Textbox(
@@ -291,8 +291,8 @@ def execute_fn(
                 elem_id="--primary-50",
                 interactive=False,
                 show_copy_button=True,
-                lines=15,
-                max_lines=15
+                lines=12,
+                max_lines=12
             )
     images = []
     if "files" in json_obj:
@@ -356,8 +356,8 @@ def execute_fn_with_stream(
                     value=json_obj["output"],
                     label=output_err_msg,
                     elem_id="red",
-                    lines=15,
-                    max_lines=15
+                    lines=12,
+                    max_lines=12
                 )
                 if flag:
                     history.append(
@@ -395,8 +395,8 @@ def execute_fn_with_stream(
                         elem_id="amber", 
                         interactive=False, 
                         show_copy_button=True, 
-                        lines=15,
-                        max_lines=15
+                        lines=12,
+                        max_lines=12
                     )
                 else:
                     output = gr.Textbox(
@@ -405,8 +405,8 @@ def execute_fn_with_stream(
                         elem_id="--primary-50", 
                         interactive=False, 
                         show_copy_button=True,
-                        lines=15,
-                        max_lines=15
+                        lines=12,
+                        max_lines=12
                     )
             yield [history, output, code, images]
     history[-1][1] = history[-1][1].rstrip("▌")
@@ -544,7 +544,7 @@ def save_fn(
 ):
     data = json.dumps(
         {
-            "prompt": code,
+            "script": code,
             "model_family": models_list[model]["model_family"],
             "model_name": models_list[model]["model_name"],
             "language": language,
@@ -558,19 +558,17 @@ def save_fn(
             "embedding_model_name": "amazon.titan-embed-text-v1"
         }
     )
-    response = json.loads(
-        requests.post(
+    res = requests.post(
             "http://" + controller_url + "/save",
             data=data
         ).text
-    )
-    
+    response = json.loads(req)
     if "error" in response:
         message = f'\nStack Trace: {response["stacktrace"]}' if "stacktrace" in response else ""
-        return None
+        gr.Error(message)
+        return gr.update(interactive=True)
 
-    print(response)
-    gr.Info(response)
+    gr.Info(res)
     return gr.update(interactive=False)
 
 def load_fn(
@@ -579,7 +577,7 @@ def load_fn(
 ):
     data = json.dumps(
         {
-            "prompt": code,
+            "prompt": prompt,
             "language": language,
             "stream": False,
             "embedding_model_family": "bedrock", 
@@ -587,24 +585,23 @@ def load_fn(
             "threshold": 0.5
         }
     )
-    response = json.loads(
-        requests.post(
-            "http://" + controller_url + "/load",
-            data=data
-        ).text
-    )
+    res = requests.post(
+        "http://" + controller_url + "/load",
+        data=data
+    ).text
+    response = json.loads(res)
     
     if "error" in response:
         message = f'\nStack Trace: {response["stacktrace"]}' if "stacktrace" in response else ""
         return None
 
-    print(response)
-    gr.Info(response)
+    # gr.Info(response[0]["task_desc"])
     
     ret = clear_fn()
-    ret[2] = response["code"]
-    ret[3] = [[], [f"Here is the loaded code\n```{l_mapping[language]}\n{ret[2]}\n```"]]
-    return gr.update(interactive=False)
+    ret[0].passed_security_scan = True
+    ret[2] = response[0]["code"]
+    ret[1] = [[f'Load the following task:\n{response[0]["task_desc"]}', f"Task code:\n```{l_mapping[language]}\n{ret[2]}\n```"]]
+    return ret + [""]
 
 def can_exec(conv, code):
     if code != "" and conv.passed_security_scan:
@@ -617,6 +614,9 @@ def can_exec(conv, code):
             gr.update(interactive=False),
             gr.update(interactive=False)
         )
+
+def disable_exec():
+    return gr.update(interactive=False)
     
 def empty_folder():
     files = os.listdir(files_path)
@@ -645,8 +645,8 @@ def clear_fn():
         elem_id="--primary-50", 
         interactive=False, 
         show_copy_button=True, 
-        lines=15, 
-        max_lines=15
+        lines=12, 
+        max_lines=12
     )] + [[]] + [gr.Textbox(
         value="",
         label=sec_out_info_msg, 
@@ -655,7 +655,7 @@ def clear_fn():
         show_copy_button=True, 
         lines=7, 
         max_lines=7
-    )]
+    ), ""]
 
 def vote(data: gr.LikeData, conv):
     if data.liked:
@@ -678,7 +678,7 @@ def web_ui():
                     with gr.Column(scale=4):
                         with gr.Group(elem_id="chatbot-group"):
                             with gr.Row():
-                                chatbot = gr.Chatbot(elem_id="chatbot-window", show_copy_button=True, height=600)
+                                chatbot = gr.Chatbot(elem_id="chatbot-window", show_copy_button=True, height=450)
                             with gr.Row():
                                 textbox = gr.Textbox(
                                     show_label=False, 
@@ -697,13 +697,13 @@ def web_ui():
                                     scale=1, 
                                     elem_id="chatbot-button"
                                 )
-                        out = gr.Textbox(value="",label=output_info_msg, interactive=False, show_copy_button=True, lines=15, max_lines=15)
+                        out = gr.Textbox(value="",label=output_info_msg, interactive=False, show_copy_button=True, lines=12, max_lines=12)
                     with gr.Column(scale=3):
                         with gr.Group(elem_id="script-group"):
                             script = gr.Code(value="",label="Script", language = l_mapping[languages[0]], interactive=False, lines=16)
                             scan_stat = gr.Markdown(scan_empty_msg)
                             with gr.Row():
-                                load_box = gr.Textbox(show_label=False, placeholder="Enter detailed task description to load.", scale=15, container=False)
+                                load_box = gr.Textbox(show_label=False, placeholder="Enter detailed task description to load.", scale=30, container=False)
                                 load = gr.Button(variant="primary", value="Load", scale=1)
                                 save = gr.Button(value="Save 💾️", interactive=False, scale=1)
                                 execute = gr.Button(value="Execute", interactive=False, variant="primary", scale=1)
@@ -716,12 +716,12 @@ def web_ui():
             with gr.Column(scale=1):
                 language = gr.Dropdown(languages,label='Langauge Selection', value=languages[0]) # Langauge Selection
                 model = gr.Dropdown(models_list.keys(),label="Model Selection", value=list(models_list.keys())[0]) # Model Selection
-                streaming = gr.Checkbox(label='Stream chat response', value=True)
-                timeout = gr.Number(label="Execution Timeout", precision=0, minimum=10, maximum=3600, value=30)
                 temprature = gr.Slider(label="Temprature", step=0.1, minimum=0, maximum=1, value=0.1)
                 top_p = gr.Slider(label="Top_p", step=0.1, minimum=0, maximum=1, value=0.1)
                 top_k = gr.Slider(label="Top_k", step=1, minimum=1, maximum=500, value=5)
-                with gr.Accordion(label="Instructions:", open=True):
+                streaming = gr.Checkbox(label='Stream chat response', value=True)
+                timeout = gr.Number(label="Execution Timeout", precision=0, minimum=10, maximum=3600, value=30)
+                with gr.Accordion(label="Instructions:", open=False):
                     gr.Markdown(instructions)
             
         language.change(change_language, [language], [state, chatbot, script, out, exp_out, image], queue=False)
@@ -761,14 +761,14 @@ def web_ui():
         clear_btn.click(
             clear_fn, 
             None, 
-            [state, chatbot, script, exp_out, out, image, sec_out],
+            [state, chatbot, script, exp_out, out, image, sec_out, load_box],
             show_progress=False,
             queue=False
         )
         execute.click(
-            lambda :[gr.update(interactive=False)],
+            disable_exec,
             None,
-            [execute]
+            execute
         ).then(
             execute_fn_with_stream if streaming.value else execute_fn, 
             [state, chatbot, script, exp_out, model, language, timeout, streaming, temprature, top_p, top_k], 
@@ -785,7 +785,7 @@ def web_ui():
         load.click(
             load_fn,
             [load_box, language],
-            [state, chatbot, script, exp_out, out, image, sec_out]
+            [state, chatbot, script, exp_out, out, image, sec_out, load_box]
         )
         chatbot.like(
             vote, 
