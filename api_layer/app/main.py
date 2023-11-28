@@ -107,9 +107,12 @@ def invoke(request: Dict[Any, Any]):
 
 def invoke_with_response_stream(stream_response):
     try:
+        start = time.perf_counter()
         for next_item in stream_response:
             # if "generated_text"  in next_item and next_item["generated_text"] != "<EOS_TOKEN>":
             yield json.dumps(next_item) + "\n"
+        latency = int((time.perf_counter() - start) * 1000)
+        publish_metrics(latency)
     except Exception as e:
         # Handle any exceptions that occur during execution
         tb = traceback.format_exc()
@@ -119,7 +122,6 @@ def invoke_with_response_stream(stream_response):
 @app.post("/invoke_stream")
 def invoke_stream(request: Dict[Any, Any]):
     table_name = os.getenv("APP_TABLE_NAME", "")
-    start = time.perf_counter()
     params = request
     req_params = [
         "model_family",
@@ -141,8 +143,6 @@ def invoke_stream(request: Dict[Any, Any]):
             ),
             media_type="application/x-ndjson"
         )
-        latency = int((time.perf_counter() - start) * 1000)
-        publish_metrics(latency)
         return ret
     
     except Exception as e:

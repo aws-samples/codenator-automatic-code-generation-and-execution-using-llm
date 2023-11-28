@@ -7,6 +7,7 @@ from typing import Dict, Any
 from scanners.semgrep import SemgrepScanner
 from scanners.codeguru import CodeGuruScanner
 import traceback
+import boto3
 import time
 import os
 

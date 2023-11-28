@@ -1,14 +1,14 @@
 import uuid
-import utils
 import json
 from utils import (
     send_req_to_agent,
     security_scan_script,
     send_script_to_exc,
-    extract_script
+    extract_script,
+    get_languages
 )
-
-CONVERSATIONS = {}
+import boto3
+import os
 
 class Conversation:
     def __init__(
@@ -22,17 +22,12 @@ class Conversation:
         model_params,
         conv_id: str=""
     ):
-        self.id = conv_id if conv_id != "" and conv_id in CONVERSATIONS else uuid.uuid4().hex[:16]
+        self.s3_client = boto3.client("s3")
+        self.bucket = os.getenv("APP_CONV_BUCKET")
+        self.prefix = os.getenv("APP_CONV_KEY")
+        self.id = conv_id if conv_id != "" else uuid.uuid4().hex
         self.roles = roles
         self.system_prompt = prompt
-        if conv_id == "":
-            self.history = ""
-            self.last_agent_message = ""
-            CONVERSATIONS[self.id] = {}
-            self.append_chat(prompt, 0)
-        else:
-            self.history = CONVERSATIONS[self.id]["history"]
-            self.last_agent_message = CONVERSATIONS[self.id]["last_agent_message"]
         self.agent = send_req_to_agent
         self.scanner = security_scan_script
         self.executor = send_script_to_exc
@@ -42,19 +37,54 @@ class Conversation:
         self.model_name = model_name
         self.model_metadata = model_metadata
         self.params = model_params
+        if conv_id == "":
+            self.history = ""
+            self.last_agent_message = ""
+            self.append_chat(prompt, 0)
+        else:
+            self.load()
+
+    def save(self):
+        data = {
+            "history": self.history,
+            "last_agent_message": self.last_agent_message,
+            "language": self.language,
+            "model_family": self.model_family,
+            "model_name": self.model_name,
+            "model_params": self.params
+        }
+        self.s3_client.put_object(
+            Body=json.dumps(data).encode(), 
+            Bucket=self.bucket, 
+            Key=os.path.join(self.prefix, self.id + ".json")
+        )
+    
+    def load(self):
+        data = self.s3_client.get_object(
+            Bucket=self.bucket,
+            Key=os.path.join(self.prefix, self.id + ".json")
+        )
+        data_dict = json.loads(data["Body"].read())
+        self.history = data_dict["history"]
+        self.last_agent_message = data_dict["last_agent_message"]
+        self.language = data_dict["language"]
+        self.model_family = data_dict["model_family"]
+        self.model_name = data_dict["model_name"]
+        self.params = data_dict["model_params"]
+        
         
     def append_chat(self, text, role=0):
         self.history += "\n" + self.roles[role] + text
-        CONVERSATIONS[self.id]["history"] = self.history
+        self.save()
         
-    def send_to_agent(self, stream):
+    def send_to_agent(self, stream=False):
         def form_response(text=None):
-            CONVERSATIONS[self.id]["history"] = self.history
-            CONVERSATIONS[self.id]["last_agent_message"] = self.last_agent_message
+            self.save()
+            LANGUAGES = get_languages()
             script = self.script_extractor(
                 self.last_agent_message,
                 self.model_metadata,
-                utils.LANGUAGES[self.language]["tag_name"]
+                LANGUAGES[self.language]["tag_name"]
             )
 
             if script:
@@ -102,13 +132,14 @@ class Conversation:
         return res
     
     def exec_script(self, script, expected_output, timeout=10):
+        LANGUAGES = get_languages()
         full_script = ""
-        if utils.LANGUAGES[self.language]["pre_exec_script"]:
-            full_script += utils.LANGUAGES[self.language]["pre_exec_script"] + "\n"
+        if LANGUAGES[self.language]["pre_exec_script"]:
+            full_script += LANGUAGES[self.language]["pre_exec_script"] + "\n"
         full_script += script
-        if utils.LANGUAGES[self.language]["post_exec_script"]:
-            full_script += "\n" + utils.LANGUAGES[self.language]["post_exec_script"]
-        res = self.executor(full_script, utils.LANGUAGES[self.language]["kernel_name"], timeout)
+        if LANGUAGES[self.language]["post_exec_script"]:
+            full_script += "\n" + LANGUAGES[self.language]["post_exec_script"]
+        res = self.executor(full_script, LANGUAGES[self.language]["kernel_name"], timeout)
         res["script"] = script
         res["expected_output"] = expected_output
         res["conv_id"] = self.id

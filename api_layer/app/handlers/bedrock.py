@@ -41,8 +41,7 @@ class model(BaseModel):
         super().__init__(table_name)
         self.model_name = model_name
         self.bedrock_client = boto3.client(
-            service_name="bedrock-runtime",
-            region_name="us-west-2"
+            service_name="bedrock-runtime"
         )
         self.invoke_api = self.bedrock_client.invoke_model
         self.invoke_api_with_response_stream = self.bedrock_client.invoke_model_with_response_stream

@@ -83,6 +83,19 @@ def load_task(request: Dict[Any, Any]):
         tb = traceback.format_exc()
         logger.error(f"Error {e}\nStackTrace: {tb}")
         return {"error": f"An error occurred: {str(e)}", "stacktrace": tb}
+
+@app.get("/aoss/list_tasks")
+def list_tasks():
+    store_type = "aoss"
+    try:
+        store = stores[store_type]()
+        ret = store.list_tasks
+        return ret
+    except Exception as e:
+        # Handle any exceptions that occur during execution
+        tb = traceback.format_exc()
+        logger.error(f"Error {e}\nStackTrace: {tb}")
+        return {"error": f"An error occurred: {str(e)}", "stacktrace": tb}
     
 if __name__ == "__main__":  
     parser = argparse.ArgumentParser()

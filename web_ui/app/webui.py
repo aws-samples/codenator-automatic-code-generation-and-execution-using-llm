@@ -19,7 +19,6 @@ from constants import (
     scan_empty_msg,
     sec_out_err_msg,
     sec_out_info_msg,
-    task_store_prompt,
     files_path
 )
 
@@ -537,30 +536,31 @@ def generate_response(
 
 def save_fn(
     code,
+    model,
     language,
     temprature, 
     top_p, 
     top_k
 ):
-    prompt = task_store_prompt.replace("{code}", code)
     data = json.dumps(
         {
-            "prompt": prompt,
-            "model_family": "bedrock", 
-            "model_name": "anthropic.claude-instant-v1", 
+            "prompt": code,
+            "model_family": models_list[model]["model_family"],
+            "model_name": models_list[model]["model_name"],
             "language": language,
             "stream": False,
             "model_params": {
                 "temprature": temprature,
                 "top_p": top_p,
-                "top_k": top_k,
-                "model_type": "Claude-TS"
-            }
+                "top_k": top_k
+            },
+            "embedding_model_family": "bedrock", 
+            "embedding_model_name": "amazon.titan-embed-text-v1"
         }
     )
     response = json.loads(
         requests.post(
-            "http://" + controller_url + "/generate",
+            "http://" + controller_url + "/save",
             data=data
         ).text
     )
@@ -569,19 +569,53 @@ def save_fn(
         message = f'\nStack Trace: {response["stacktrace"]}' if "stacktrace" in response else ""
         return None
 
-    print(response["generated_text"])
-    return None
+    print(response)
+    gr.Info(response)
+    return gr.update(interactive=False)
+
+def load_fn(
+    prompt,
+    language
+):
+    data = json.dumps(
+        {
+            "prompt": code,
+            "language": language,
+            "stream": False,
+            "embedding_model_family": "bedrock", 
+            "embedding_model_name": "amazon.titan-embed-text-v1",
+            "threshold": 0.5
+        }
+    )
+    response = json.loads(
+        requests.post(
+            "http://" + controller_url + "/load",
+            data=data
+        ).text
+    )
+    
+    if "error" in response:
+        message = f'\nStack Trace: {response["stacktrace"]}' if "stacktrace" in response else ""
+        return None
+
+    print(response)
+    gr.Info(response)
+    
+    ret = clear_fn()
+    ret[2] = response["code"]
+    ret[3] = [[], [f"Here is the loaded code\n```{l_mapping[language]}\n{ret[2]}\n```"]]
+    return gr.update(interactive=False)
 
 def can_exec(conv, code):
     if code != "" and conv.passed_security_scan:
         return (
-            gr.Button(value="Approve and Execute", interactive=True),
-            gr.Button(value="Save 💾️", interactive=True)
+            gr.update(interactive=True),
+            gr.update(interactive=True)
         )
     else:
         return (
-            gr.Button(value="Approve and Execute", interactive=False),
-            gr.Button(value="Save 💾️", interactive=False)
+            gr.update(interactive=False),
+            gr.update(interactive=False)
         )
     
 def empty_folder():
@@ -633,65 +667,62 @@ def add_text(message, history):
     history += [[message, None]]
     return ["", history]
 
-def disable_exec_btn():
-    return (
-        gr.Button(value="Approve and Execute", interactive=False),
-        gr.Button(value="Save 💾️", interactive=False)
-    )
-
 def web_ui():
     global state, chatbot, script, out, exp_out, scan_stat, sec_out
-    with gr.Blocks(css=css, theme=gr.themes.Base(neutral_hue="slate")) as webUI:
+    with gr.Blocks(css=css, theme=gr.themes.Base()) as webUI:
         state = gr.State(ConvState())
         gr.Markdown(welcome_message)
-        with gr.Accordion(label="Instructions:", open=False):
-            gr.Markdown(instructions)
-        with gr.Row(equal_height=True):
-            with gr.Column(scale=5):
-                with gr.Group(elem_id="chatbot-group"):
-                    with gr.Row():
-                        chatbot = gr.Chatbot(elem_id="chatbot-window", show_copy_button=True, height=600)
-                    with gr.Row():
-                        textbox = gr.Textbox(
-                            show_label=False, 
-                            placeholder="Enter your prompt here and press ENTER", 
-                            container=False, 
-                            scale=16
-                        )
-                        submit = gr.Button(
-                            value="💬️", 
-                            variant="primary", 
-                            scale=2, 
-                            elem_id="chatbot-button"
-                        )
-                        clear_btn = gr.ClearButton(
-                            value="🗑️", 
-                            scale=1, 
-                            elem_id="chatbot-button"
-                        )
-                out = gr.Textbox(value="",label=output_info_msg, interactive=False, show_copy_button=True, lines=15, max_lines=15)
-            with gr.Column(scale=3):
-                with gr.Group(elem_id="script-group"):
-                    with gr.Row():
-                        language = gr.Dropdown(languages,label='Langauge Selection', value=languages[0]) # Langauge Selection
-                        model = gr.Dropdown(models_list.keys(),label="Model Selection", value=list(models_list.keys())[0]) # Model Selection
-                    scan_stat = gr.Markdown(scan_empty_msg)
-                    script = gr.Code(value="",label="Script", language = l_mapping[languages[0]], interactive=False, lines=16)
-                    with gr.Row():
-                        execute = gr.Button(value="Approve and Execute", interactive=False)
-                        save = gr.Button(value="Save 💾️", interactive=False)
-                image = gr.Gallery(label="Image", show_download_button=True, preview=True, object_fit="fill", selected_index=0)
-        
-        with gr.Accordion(label="Other Outputs", open=False):
-            exp_out = gr.Textbox(value="",label="Expected Output", interactive=False, lines=7, max_lines=7)
-            sec_out = gr.Textbox(value="",label=sec_out_info_msg, interactive=False, lines=7, max_lines=7)
-        with gr.Accordion(label="Parameters", open=False):
-            streaming = gr.Checkbox(label='Stream chat response', value=True)
-            timeout = gr.Number(label="Execution Timeout", precision=0, minimum=10, maximum=3600, value=30)
-            temprature = gr.Slider(label="Temprature", step=0.1, minimum=0, maximum=1, value=0.1)
-            top_p = gr.Slider(label="Top_p", step=0.1, minimum=0, maximum=1, value=0.1)
-            top_k = gr.Slider(label="Top_k", step=1, minimum=1, maximum=500, value=5)
-            
+        with gr.Row():
+            with gr.Column(scale=8):
+                with gr.Row(equal_height=True):
+                    with gr.Column(scale=4):
+                        with gr.Group(elem_id="chatbot-group"):
+                            with gr.Row():
+                                chatbot = gr.Chatbot(elem_id="chatbot-window", show_copy_button=True, height=600)
+                            with gr.Row():
+                                textbox = gr.Textbox(
+                                    show_label=False, 
+                                    placeholder="Enter your prompt here and press ENTER", 
+                                    container=False, 
+                                    scale=16
+                                )
+                                submit = gr.Button(
+                                    value="💬️", 
+                                    variant="primary", 
+                                    scale=2, 
+                                    elem_id="chatbot-button"
+                                )
+                                clear_btn = gr.ClearButton(
+                                    value="🗑️", 
+                                    scale=1, 
+                                    elem_id="chatbot-button"
+                                )
+                        out = gr.Textbox(value="",label=output_info_msg, interactive=False, show_copy_button=True, lines=15, max_lines=15)
+                    with gr.Column(scale=3):
+                        with gr.Group(elem_id="script-group"):
+                            script = gr.Code(value="",label="Script", language = l_mapping[languages[0]], interactive=False, lines=16)
+                            scan_stat = gr.Markdown(scan_empty_msg)
+                            with gr.Row():
+                                load_box = gr.Textbox(show_label=False, placeholder="Enter detailed task description to load.", scale=15, container=False)
+                                load = gr.Button(variant="primary", value="Load", scale=1)
+                                save = gr.Button(value="Save 💾️", interactive=False, scale=1)
+                                execute = gr.Button(value="Execute", interactive=False, variant="primary", scale=1)
+                        image = gr.Gallery(label="Image", show_download_button=True, preview=True, object_fit="fill", selected_index=0)
+
+                with gr.Accordion(label="Other Outputs", open=False):
+                    exp_out = gr.Textbox(value="",label="Expected Output", interactive=False, lines=7, max_lines=7)
+                    sec_out = gr.Textbox(value="",label=sec_out_info_msg, interactive=False, lines=7, max_lines=7)
+                    
+            with gr.Column(scale=1):
+                language = gr.Dropdown(languages,label='Langauge Selection', value=languages[0]) # Langauge Selection
+                model = gr.Dropdown(models_list.keys(),label="Model Selection", value=list(models_list.keys())[0]) # Model Selection
+                streaming = gr.Checkbox(label='Stream chat response', value=True)
+                timeout = gr.Number(label="Execution Timeout", precision=0, minimum=10, maximum=3600, value=30)
+                temprature = gr.Slider(label="Temprature", step=0.1, minimum=0, maximum=1, value=0.1)
+                top_p = gr.Slider(label="Top_p", step=0.1, minimum=0, maximum=1, value=0.1)
+                top_k = gr.Slider(label="Top_k", step=1, minimum=1, maximum=500, value=5)
+                with gr.Accordion(label="Instructions:", open=True):
+                    gr.Markdown(instructions)
             
         language.change(change_language, [language], [state, chatbot, script, out, exp_out, image], queue=False)
         model.change(change_model, None, [state, chatbot, script, out, exp_out, image], queue=False)
@@ -735,9 +766,9 @@ def web_ui():
             queue=False
         )
         execute.click(
-            disable_exec_btn,
+            lambda :[gr.update(interactive=False)],
             None,
-            [execute, save]
+            [execute]
         ).then(
             execute_fn_with_stream if streaming.value else execute_fn, 
             [state, chatbot, script, exp_out, model, language, timeout, streaming, temprature, top_p, top_k], 
@@ -747,9 +778,14 @@ def web_ui():
         )
         save.click(
             save_fn, 
-            [script, language, temprature, top_p, top_k], 
-            None,
+            [script, model, language, temprature, top_p, top_k], 
+            [save],
             show_progress=False
+        )
+        load.click(
+            load_fn,
+            [load_box, language],
+            [state, chatbot, script, exp_out, out, image, sec_out]
         )
         chatbot.like(
             vote, 

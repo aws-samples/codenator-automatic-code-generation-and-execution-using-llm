@@ -1,16 +1,12 @@
 from importlib import import_module
+from prompt.store import TemplateStore
 import requests
+import logging as logger
 import json
 import boto3
 import base64
-
-LANGUAGES = {}
-api_layer_url = ""
-code_executor_url = ""
-code_scanner_url = ""
-model_metadata = {}
-models_metadata_db  = ""
-cypher = None
+import time
+import os
 
 class EncryptorClass:
     def __init__(self, key_id):
@@ -29,8 +25,28 @@ class EncryptorClass:
         )
         return ret["Plaintext"].decode()
 
+def publish_metrics(latency) -> None:
+    cw_client = boto3.client("cloudwatch")
+    namespace = os.getenv("CW_NAMESPACE", "Codenator/controller/")
+    logger.debug(f"Publishing CW metrics (Namespace: {namespace})")
+    cw_client.put_metric_data(
+        Namespace=namespace,
+        MetricData=[
+            {
+                'MetricName': "invocations",
+                'Value': 1,
+                'Unit': 'Count'
+            },
+            {
+                'MetricName': "latency",
+                'Value': latency,
+                'Unit': 'Count'
+            }
+        ]
+    )
+
 def get_models_list():
-    ret = requests.get(url=api_layer_url.split("/invoke")[0] + "/list_models")
+    ret = requests.get(url=os.getenv("APP_API_LAYER_URL").split("/invoke")[0] + "/list_models")
     return json.loads(ret.text)["models"]
 
 def get_model_type(model_family, model_name):
@@ -44,6 +60,7 @@ def get_model_type(model_family, model_name):
     return model_type, can_stream
 
 def get_model_metadata(model_type):
+    models_metadata_db = os.getenv("APP_MODELS_METADATA_DB")
     if models_metadata_db != "":
         ddb_client = boto3.client("dynamodb")
         ret = ddb_client.get_item(
@@ -59,9 +76,12 @@ def get_model_metadata(model_type):
         )["Item"]["metadata"]["S"]
         return json.loads(ret)
     else:
+        with open(os.getenv("APP_MODELS_METADATA_FILE"), "r") as json_f:
+            models_metadata = json.load(json_f)
         return models_metadata[model_type]
 
 def get_languages():
+    models_metadata_db = os.getenv("APP_MODELS_METADATA_DB")
     if models_metadata_db != "":
         ddb_client = boto3.client("dynamodb")
         ret = ddb_client.get_item(
@@ -77,10 +97,13 @@ def get_languages():
         )["Item"]["data"]["S"]
         return json.loads(ret)
     else:
+        with open(os.getenv("APPP_LANGUAGES_FILE"), "r") as json_f:
+            LANGUAGES = json.load(json_f)
         return LANGUAGES
 
 def send_req_to_agent(body, model_family, model_name, model_metadata):
     def iter_func(result, model_metadata):
+        start = time.perf_counter()
         for chunk in result.iter_lines():
             res = json.loads(chunk)
             if "generated_text"  in res and res["generated_text"] != model_metadata["EOS"]:
@@ -91,10 +114,19 @@ def send_req_to_agent(body, model_family, model_name, model_metadata):
                     else:
                         yield result
                         break
+                elif model_metadata["ROLES"][1] in res["generated_text"]:
+                    result = res["generated_text"].split(model_metadata["ROLES"][1])[0]
+                    if result == "":
+                        break
+                    else:
+                        yield result
+                        break
                 elif res["generated_text"] != "":
                     yield res["generated_text"]
             elif "error"  in res:
                 raise Exception(f'Error {res["error"]}\StackTrace: {res.get("stacktrace","")}')
+        latency = int((time.perf_counter() - start) * 1000)
+        publish_metrics(latency)
     
     data = {
         "body": body, 
@@ -102,7 +134,7 @@ def send_req_to_agent(body, model_family, model_name, model_metadata):
         "model_name": model_name
     }
     ret = requests.post(
-        url=api_layer_url + ("" if not body["stream"] else "_stream"), 
+        url=os.getenv("APP_API_LAYER_URL") + ("" if not body["stream"] else "_stream"), 
         data=json.dumps(data),
         stream=body["stream"]
     )
@@ -122,12 +154,14 @@ def security_scan_script(script, language, scanner="semgrep"):
         "scanner": scanner
     }
     ret = requests.post(
-        url=code_scanner_url, 
+        url=os.getenv("APP_CODE_SCANNER_URL"), 
         data=json.dumps(data)
     )
     return json.loads(ret.text)
 
 def send_script_to_exc(script, kernel_name, timeout=10):
+    kms = os.getenv("APP_KMS_KEY")
+    cypher = EncryptorClass(kms)
     script_blob = cypher.encrypt(script)
     data = {
         "code": script_blob, 
@@ -135,7 +169,7 @@ def send_script_to_exc(script, kernel_name, timeout=10):
         "timeout": timeout
     }
     ret = requests.post(
-        url=code_executor_url, 
+        url=os.getenv("APP_CODE_EXECUTOR_URL"), 
         data=json.dumps(data)
     )
     return json.loads(ret.text)
@@ -171,3 +205,10 @@ def extract_script(text, model_metadata, tag_name):
     except:
         return None
     return None
+
+def get_prompt_store():
+    prompt_store_db = os.getenv("APP_PROMPT_STORE", "")
+    prompt_store = TemplateStore()
+    if prompt_store_db == "":
+        prompt_store.read_from_json(os.getenv("APP_PROMPT_STORE_FILE"))
+    return prompt_store

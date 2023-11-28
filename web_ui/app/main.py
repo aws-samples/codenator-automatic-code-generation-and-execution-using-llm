@@ -40,7 +40,8 @@ if __name__ == "__main__":
     UI = web_ui()
     UI.queue(
         status_update_rate=10,
-        api_open=False
+        api_open=False,
+        default_concurrency_limit=30
     ).launch(
         debug=args.debug,
         share=args.share,
