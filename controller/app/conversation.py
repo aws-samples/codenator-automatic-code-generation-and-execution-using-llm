@@ -68,8 +68,9 @@ class Conversation:
         self.history = data_dict["history"]
         self.last_agent_message = data_dict["last_agent_message"]
         self.language = data_dict["language"]
-        self.model_family = data_dict["model_family"]
-        self.model_name = data_dict["model_name"]
+        if data_dict["model_family"] != "" and data_dict["model_name"] != "":
+            self.model_family = data_dict["model_family"]
+            self.model_name = data_dict["model_name"]
         self.params = data_dict["model_params"]
         
         

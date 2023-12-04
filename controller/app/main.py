@@ -360,7 +360,6 @@ def save(request: Dict[Any, Any]):
             "code": script,
             "language": LANGUAGES[language]["display_name"]
         }
-        conv_id = ""
         model_metadata = get_model_metadata(model_type)
         prompt_store = get_prompt_store()
         conv = Conversation(
@@ -373,8 +372,7 @@ def save(request: Dict[Any, Any]):
             model_family,
             model_name,
             model_metadata,
-            model_params,
-            conv_id
+            model_params
         )
         
         res = conv.send_to_agent()
@@ -417,6 +415,8 @@ def load(request: Dict[Any, Any]):
         params =request
         req_params = [
             "prompt",
+            "model_family",
+            "model_name",
             "embedding_model_family",
             "embedding_model_name",
             "language"            
@@ -425,12 +425,19 @@ def load(request: Dict[Any, Any]):
             if req_param not in params:
                 return {"error": f"Request must contain [{req_param}] parameter."}
         prompt = params.get("prompt")
+        language = params.get("language")
+        model_family = params.get("model_family")
+        model_name = params.get("model_name")
         embedding_model_params = params.get("embedding_model_params", {})
         embedding_model_family = params.get("embedding_model_family")
         embedding_model_name = params.get("embedding_model_name")
         threshold = params.get("threshold", 0.5)
+        limit = params.get("limit", 1)
         embedding_model_params["prompt"] = prompt
         embedding_model_params["stream"] = False
+        model_type, can_stream = get_model_type(model_family, model_name)
+        model_type = params.get("model_type", model_type)
+        model_metadata = get_model_metadata(model_type)
         data = {
             "body": embedding_model_params, 
             "model_family": embedding_model_family, 
@@ -445,11 +452,53 @@ def load(request: Dict[Any, Any]):
         url = f'{os.getenv("APP_TASK_STORE_URL")}/load_task'
         data = {
             "embedding": embedding,
-            "threshold": threshold
+            "threshold": threshold,
+            "limit": limit
         }
-        latency = int((time.perf_counter() - start) * 1000)
-        publish_metrics(latency)
-        return requests.post(url=url, data=json.dumps(data)).json()
+        matches = requests.post(url=url, data=json.dumps(data)).json()
+        if len(matches) > 0:
+            LANGUAGES = get_languages()
+            params = {
+                "display_name": LANGUAGES[language]["display_name"],
+                "tag_name": LANGUAGES[language]["tag_name"],
+                "error_message": "",
+                "script_output": "",
+                "language_instructions": LANGUAGES[language]["language_instructions"]
+            }
+
+            prompt_store = get_prompt_store()
+            conv = Conversation(
+                model_metadata["ROLES"], 
+                prompt_store.get_prompt_from_template(
+                    model_metadata["SYSTEM_PROMPT_TMPLT"],
+                    params
+                ),
+                language,
+                model_family,
+                model_name,
+                model_metadata,
+                {}
+            )
+            conv.append_chat(
+                prompt_store.get_prompt_from_template(
+                    model_metadata["AGENT_REPLY_TMPLT"],
+                    params
+                ),
+                1
+            )
+            conv.append_chat(prompt)
+            conv.append_chat(
+                f'Here is the code:\n```{params["tag_name"]}\n{matches[0]["code"]}\n```',
+                1
+            )
+            latency = int((time.perf_counter() - start) * 1000)
+            publish_metrics(latency)
+            return {
+                "matches": matches,
+                "conv_id": conv.id
+            }
+        else:
+            return {"matches": []}
         
     except Exception as e:
         # Handle any exceptions that occur during execution

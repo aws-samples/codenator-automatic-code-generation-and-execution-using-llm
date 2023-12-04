@@ -89,7 +89,7 @@ def list_tasks():
     store_type = "aoss"
     try:
         store = stores[store_type]()
-        ret = store.list_tasks
+        ret = store.list_tasks()
         return ret
     except Exception as e:
         # Handle any exceptions that occur during execution

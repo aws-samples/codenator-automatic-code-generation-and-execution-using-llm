@@ -562,7 +562,7 @@ def save_fn(
             "http://" + controller_url + "/save",
             data=data
         ).text
-    response = json.loads(req)
+    response = json.loads(res)
     if "error" in response:
         message = f'\nStack Trace: {response["stacktrace"]}' if "stacktrace" in response else ""
         gr.Error(message)
@@ -573,6 +573,7 @@ def save_fn(
 
 def load_fn(
     prompt,
+    model,
     language
 ):
     data = json.dumps(
@@ -580,6 +581,8 @@ def load_fn(
             "prompt": prompt,
             "language": language,
             "stream": False,
+            "model_family": models_list[model]["model_family"],
+            "model_name": models_list[model]["model_name"],
             "embedding_model_family": "bedrock", 
             "embedding_model_name": "amazon.titan-embed-text-v1",
             "threshold": 0.5
@@ -590,18 +593,23 @@ def load_fn(
         data=data
     ).text
     response = json.loads(res)
-    
+    ret = clear_fn()
     if "error" in response:
         message = f'\nStack Trace: {response["stacktrace"]}' if "stacktrace" in response else ""
-        return None
+        gr.Error(message)
+        return ret + [""] + [scan_empty_msg]
 
     # gr.Info(response[0]["task_desc"])
     
-    ret = clear_fn()
-    ret[0].passed_security_scan = True
-    ret[2] = response[0]["code"]
-    ret[1] = [[f'Load the following task:\n{response[0]["task_desc"]}', f"Task code:\n```{l_mapping[language]}\n{ret[2]}\n```"]]
-    return ret + [""]
+    if len(response["matches"]) > 0:
+        ret = clear_fn()
+        ret[0].passed_security_scan = True
+        ret[2] = response["matches"][0]["code"]
+        ret[1] = [[f'Load the following task:\n{response["matches"][0]["task_desc"]}', f"Task code:\n```{l_mapping[language]}\n{ret[2]}\n```"]]
+        ret[8] = scan_pass_msg
+    else:
+        gr.Info("No matches found to load.")
+    return ret + [""] + [scan_empty_msg]
 
 def can_exec(conv, code):
     if code != "" and conv.passed_security_scan:
@@ -655,7 +663,7 @@ def clear_fn():
         show_copy_button=True, 
         lines=7, 
         max_lines=7
-    ), ""]
+    ), "", scan_empty_msg]
 
 def vote(data: gr.LikeData, conv):
     if data.liked:
@@ -669,7 +677,12 @@ def add_text(message, history):
 
 def web_ui():
     global state, chatbot, script, out, exp_out, scan_stat, sec_out
-    with gr.Blocks(css=css, theme=gr.themes.Base()) as webUI:
+
+    theme = gr.themes.Default(
+        neutral_hue="slate"
+    )
+
+    with gr.Blocks(css=css, theme=theme) as webUI:
         state = gr.State(ConvState())
         gr.Markdown(welcome_message)
         with gr.Row():
@@ -732,7 +745,8 @@ def web_ui():
             [textbox, chatbot], 
             [textbox, chatbot],
             show_progress=False,
-            queue=False
+            queue=False,
+            trigger_mode="once"
         ).then(
             generate_response_with_stream if streaming.value else generate_response, 
             [state, chatbot, model, language, streaming, temprature, top_p, top_k], 
@@ -761,9 +775,10 @@ def web_ui():
         clear_btn.click(
             clear_fn, 
             None, 
-            [state, chatbot, script, exp_out, out, image, sec_out, load_box],
+            [state, chatbot, script, exp_out, out, image, sec_out, load_box, scan_stat],
             show_progress=False,
-            queue=False
+            queue=False,
+            trigger_mode="once"
         )
         execute.click(
             disable_exec,
@@ -774,18 +789,21 @@ def web_ui():
             [state, chatbot, script, exp_out, model, language, timeout, streaming, temprature, top_p, top_k], 
             [chatbot, out, script, image],
             show_progress=False,
-            queue=streaming
+            queue=streaming,
+            trigger_mode="once"
         )
         save.click(
             save_fn, 
             [script, model, language, temprature, top_p, top_k], 
             [save],
-            show_progress=False
+            show_progress=False,
+            trigger_mode
         )
-        load.click(
+        gr.on(
+            [load.click, load_box.sumbit],
             load_fn,
-            [load_box, language],
-            [state, chatbot, script, exp_out, out, image, sec_out, load_box]
+            [load_box, model, language],
+            [state, chatbot, script, exp_out, out, image, sec_out, load_box, scan_stat]
         )
         chatbot.like(
             vote, 

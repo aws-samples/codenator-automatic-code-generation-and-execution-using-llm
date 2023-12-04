@@ -51,7 +51,7 @@ class AOSSStore(BaseStore):
           "query": {
               "knn": {
                   "embedding": {
-                      "vector": [0] * 1536,
+                      "vector": embedding,
                       "k": limit
                   }
               }
