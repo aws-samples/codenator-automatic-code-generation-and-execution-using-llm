@@ -141,7 +141,7 @@ def send_req_to_agent(body, model_family, model_name, model_metadata):
     if body["stream"]:
         return iter_func(ret, model_metadata)
     else:
-        resp = json.loads(ret.text)
+        resp = ret.json()
         if "generated_text" in resp:
             return resp["generated_text"]
         else:
@@ -157,7 +157,7 @@ def security_scan_script(script, language, scanner="semgrep"):
         url=os.getenv("APP_CODE_SCANNER_URL"), 
         data=json.dumps(data)
     )
-    return json.loads(ret.text)
+    return ret.json()
 
 def send_script_to_exc(script, kernel_name, timeout=10):
     kms = os.getenv("APP_KMS_KEY")

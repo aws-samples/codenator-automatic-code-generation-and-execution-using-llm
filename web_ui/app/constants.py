@@ -3,6 +3,28 @@ ex_out_tag = ["<expected_output>", "/expected_output>"]
 max_security_scan_retries = 3
 
 css = """
+/* Gradio app */
+gradio-app{
+ background-color:#eaeaea !important;
+}
+/* Prose */
+#main-banner .svelte-1ed2p3z .prose{
+ transform:translatex(0px) translatey(0px);
+}
+
+/* Main banner */
+#main-banner {
+ color:white;
+ background-color: #232F3E;
+ border-top-left-radius:0px;
+ border-top-right-radius:0px;
+ border-bottom-left-radius:0px;
+ border-bottom-right-radius:0px;
+ padding-left:40px;
+ padding-right:40px;
+ padding-top:10px;
+ padding-bottom:10px;
+}
 #red {background-color: #FA9F9D}
 #amber {background-color: #FFD966}
 /* Gradio container */
@@ -10,6 +32,7 @@ gradio-app .gradio-container{
  max-width:90% !important;
  width:90% !important;
  transform:translatex(0px) translatey(0px);
+ padding-top:0px !important;
 }
 
 /* Script group */
@@ -81,8 +104,9 @@ gradio-app .gradio-container .main .wrap .contain .gap .stretch .gap .stretch .g
 }
 """
 welcome_message="""
-# Welcome to Codenator 🤖️
-### Allow me to help you develop secure and robust code
+<a href="https://aws.amazon.com/what-is-cloud-computing"><img style="color:white; background-color: #232F3E;float: right;" src="https://d0.awsstatic.com/logos/powered-by-aws-white.png" alt="Powered by AWS Cloud Computing"></a>
+# <span style="color:white; background-color: #232F3E">Welcome to Codenator 🤖️.</span>
+### <span style="color:white; background-color: #232F3E">Allow me to help you develop secure and robust code</span>
 """
 instructions="""
 * Select programing language and LLM Model.<br><br>

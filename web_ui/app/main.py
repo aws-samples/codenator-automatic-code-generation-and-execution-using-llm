@@ -35,6 +35,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     webui.l_mapping = get_value_from_ddb("language_mappings", args.models_metadata_db)
     webui.models_list = get_value_from_ddb("models_list", args.models_metadata_db)
+    webui.embedding_models_list = get_value_from_ddb("embedding_models_list", args.models_metadata_db)
+    webui.scanners_list = get_value_from_ddb("scanners_list", args.models_metadata_db)
     webui.controller_url = f"{args.controller_host}:{args.controller_port}"
     webui.languages = get_languages_list(webui.controller_url)
     UI = web_ui()

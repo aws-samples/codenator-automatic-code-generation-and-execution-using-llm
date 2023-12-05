@@ -26,6 +26,8 @@ from constants import (
 languages = {}
 controller_url = ""
 models_list = {}
+embedding_models_list = {}
+scanners_list = {}
 l_mapping ={}
 
 class ConvState:
@@ -37,7 +39,8 @@ class ConvState:
 def scan_fn_with_stream(
     conv: gr.State, 
     history, 
-    code, 
+    code,
+    scanner,
     scan_status, 
     exp_out, 
     model, 
@@ -64,6 +67,7 @@ def scan_fn_with_stream(
                     "model_family": models_list[model]["model_family"], 
                     "model_name": models_list[model]["model_name"], 
                     "language": language,
+                    "scanner": scanners_list[scanner],
                     "expected_output": exp_out,
                     "conv_id": conv.conv_id,
                     "stream": stream,
@@ -159,7 +163,8 @@ def scan_fn_with_stream(
 def scan_fn(
     conv: gr.State, 
     history, 
-    code, 
+    code,
+    scanner,
     scan_status, 
     exp_out, 
     model, 
@@ -186,6 +191,7 @@ def scan_fn(
                     "model_family": models_list[model]["model_family"], 
                     "model_name": models_list[model]["model_name"], 
                     "language": language,
+                    "scanner": scanners_list[scanner],
                     "expected_output": exp_out,
                     "conv_id": conv.conv_id,
                     "stream": stream,
@@ -537,6 +543,7 @@ def generate_response(
 def save_fn(
     code,
     model,
+    embed_model,
     language,
     temprature, 
     top_p, 
@@ -554,8 +561,8 @@ def save_fn(
                 "top_p": top_p,
                 "top_k": top_k
             },
-            "embedding_model_family": "bedrock", 
-            "embedding_model_name": "amazon.titan-embed-text-v1"
+            "embedding_model_family": embedding_models_list[embed_model]["model_family"],
+            "embedding_model_name": embedding_models_list[embed_model]["model_name"],
         }
     )
     res = requests.post(
@@ -574,7 +581,9 @@ def save_fn(
 def load_fn(
     prompt,
     model,
-    language
+    embed_model,
+    language,
+    threshold
 ):
     data = json.dumps(
         {
@@ -583,9 +592,9 @@ def load_fn(
             "stream": False,
             "model_family": models_list[model]["model_family"],
             "model_name": models_list[model]["model_name"],
-            "embedding_model_family": "bedrock", 
-            "embedding_model_name": "amazon.titan-embed-text-v1",
-            "threshold": 0.5
+            "embedding_model_family": embedding_models_list[embed_model]["model_family"],
+            "embedding_model_name": embedding_models_list[embed_model]["model_name"],
+            "threshold": threshold
         }
     )
     res = requests.post(
@@ -605,7 +614,12 @@ def load_fn(
         ret = clear_fn()
         ret[0].passed_security_scan = True
         ret[2] = response["matches"][0]["code"]
-        ret[1] = [[f'Load the following task:\n{response["matches"][0]["task_desc"]}', f"Task code:\n```{l_mapping[language]}\n{ret[2]}\n```"]]
+        ret[1] = [
+            [
+                f'Load the following task:\n{response["matches"][0]["task_desc"]}',
+                f"Here is the loaded task script:\n```{l_mapping[language]}\n{ret[2]}\n```"
+            ]
+        ]
         ret[8] = scan_pass_msg
     else:
         gr.Info("No matches found to load.")
@@ -684,7 +698,7 @@ def web_ui():
 
     with gr.Blocks(css=css, theme=theme) as webUI:
         state = gr.State(ConvState())
-        gr.Markdown(welcome_message)
+        gr.Markdown(welcome_message, elem_id="main-banner")
         with gr.Row():
             with gr.Column(scale=8):
                 with gr.Row(equal_height=True):
@@ -710,13 +724,25 @@ def web_ui():
                                     scale=1, 
                                     elem_id="chatbot-button"
                                 )
-                        out = gr.Textbox(value="",label=output_info_msg, interactive=False, show_copy_button=True, lines=12, max_lines=12)
+                        out = gr.Textbox(
+                            value="",
+                            label=output_info_msg,
+                            interactive=False,
+                            show_copy_button=True,
+                            lines=12,
+                            max_lines=12
+                        )
                     with gr.Column(scale=3):
                         with gr.Group(elem_id="script-group"):
                             script = gr.Code(value="",label="Script", language = l_mapping[languages[0]], interactive=False, lines=16)
                             scan_stat = gr.Markdown(scan_empty_msg)
                             with gr.Row():
-                                load_box = gr.Textbox(show_label=False, placeholder="Enter detailed task description to load.", scale=30, container=False)
+                                load_box = gr.Textbox(
+                                    show_label=False,
+                                    placeholder="Enter detailed task description to load.",
+                                    scale=30,
+                                    container=False
+                                )
                                 load = gr.Button(variant="primary", value="Load", scale=1)
                                 save = gr.Button(value="Save 💾️", interactive=False, scale=1)
                                 execute = gr.Button(value="Execute", interactive=False, variant="primary", scale=1)
@@ -727,15 +753,19 @@ def web_ui():
                     sec_out = gr.Textbox(value="",label=sec_out_info_msg, interactive=False, lines=7, max_lines=7)
                     
             with gr.Column(scale=1):
-                language = gr.Dropdown(languages,label='Langauge Selection', value=languages[0]) # Langauge Selection
-                model = gr.Dropdown(models_list.keys(),label="Model Selection", value=list(models_list.keys())[0]) # Model Selection
-                temprature = gr.Slider(label="Temprature", step=0.1, minimum=0, maximum=1, value=0.1)
-                top_p = gr.Slider(label="Top_p", step=0.1, minimum=0, maximum=1, value=0.1)
-                top_k = gr.Slider(label="Top_k", step=1, minimum=1, maximum=500, value=5)
-                streaming = gr.Checkbox(label='Stream chat response', value=True)
-                timeout = gr.Number(label="Execution Timeout", precision=0, minimum=10, maximum=3600, value=30)
-                with gr.Accordion(label="Instructions:", open=False):
+                with gr.Tab("Instructions"):
                     gr.Markdown(instructions)
+                with gr.Tab("Properties"):
+                    language = gr.Dropdown(languages,label='Programing Langauge', value=languages[0])
+                    model = gr.Dropdown(models_list.keys(),label="LLM Model", value=list(models_list.keys())[0])
+                    temprature = gr.Slider(label="Temprature", step=0.1, minimum=0, maximum=1, value=0.1)
+                    top_p = gr.Slider(label="Top_p", step=0.1, minimum=0, maximum=1, value=0.1)
+                    top_k = gr.Slider(label="Top_k", step=1, minimum=1, maximum=500, value=5)
+                    streaming = gr.Checkbox(label='Stream chat response', value=True)
+                    embed_model = gr.Dropdown(embedding_models_list.keys(),label="Embedding Model", value=list(embedding_models_list.keys())[0])                    
+                    threshold = gr.Slider(label="Loading Match Threshold", step=0.05, minimum=0.05, maximum=1.00, value=0.30)
+                    scanner = gr.Dropdown(scanners_list.keys(),label="Security Scanner", value=list(scanners_list.keys())[0])
+                    timeout = gr.Number(label="Execution Timeout", precision=0, minimum=10, maximum=3600, value=30)
             
         language.change(change_language, [language], [state, chatbot, script, out, exp_out, image], queue=False)
         model.change(change_model, None, [state, chatbot, script, out, exp_out, image], queue=False)
@@ -745,8 +775,7 @@ def web_ui():
             [textbox, chatbot], 
             [textbox, chatbot],
             show_progress=False,
-            queue=False,
-            trigger_mode="once"
+            queue=False
         ).then(
             generate_response_with_stream if streaming.value else generate_response, 
             [state, chatbot, model, language, streaming, temprature, top_p, top_k], 
@@ -761,7 +790,7 @@ def web_ui():
         #     show_progress=False
         # ).then(
             scan_fn_with_stream if streaming.value else scan_fn, 
-            [state, chatbot, script, scan_stat, exp_out, model, language, streaming, temprature, top_p, top_k], 
+            [state, chatbot, script, scanner, scan_stat, exp_out, model, language, streaming, temprature, top_p, top_k], 
             [state, chatbot, sec_out, script, scan_stat], queue=streaming,
             show_progress=False
         ).then(
@@ -777,8 +806,7 @@ def web_ui():
             None, 
             [state, chatbot, script, exp_out, out, image, sec_out, load_box, scan_stat],
             show_progress=False,
-            queue=False,
-            trigger_mode="once"
+            queue=False
         )
         execute.click(
             disable_exec,
@@ -789,21 +817,21 @@ def web_ui():
             [state, chatbot, script, exp_out, model, language, timeout, streaming, temprature, top_p, top_k], 
             [chatbot, out, script, image],
             show_progress=False,
-            queue=streaming,
-            trigger_mode="once"
+            queue=streaming
         )
         save.click(
             save_fn, 
-            [script, model, language, temprature, top_p, top_k], 
+            [script, model, embed_model, language, temprature, top_p, top_k], 
             [save],
-            show_progress=False,
-            trigger_mode
+            show_progress=False
         )
         gr.on(
-            [load.click, load_box.sumbit],
+            [load.click, load_box.submit],
             load_fn,
-            [load_box, model, language],
-            [state, chatbot, script, exp_out, out, image, sec_out, load_box, scan_stat]
+            [load_box, model, embed_model, language, threshold],
+            [state, chatbot, script, exp_out, out, image, sec_out, load_box, scan_stat],
+            show_progress=False,
+            queue=False
         )
         chatbot.like(
             vote, 

@@ -125,9 +125,9 @@ class Conversation:
             ret = form_response()
             return ret
 
-    def scan_script(self, script):
+    def scan_script(self, script, scanner: str="semgrep"):
         res = {}
-        res["vulnerabilities"] = self.scanner(script, self.language)
+        res["vulnerabilities"] = self.scanner(script, self.language, scanner=scanner)
         res["script"] = script
         res["conv_id"] = self.id
         return res

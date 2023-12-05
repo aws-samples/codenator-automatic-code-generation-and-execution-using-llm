@@ -155,6 +155,7 @@ def scan(request: Dict[Any, Any]):
         if model_type == "":
             return {"error": f"Unknown model!\nmodel_family: {model_family}, model_name: {model_name}"}
         model_params = params.get("model_params", {})
+        scanner = params.get("scanner", "semgrep")
         stream = params.get("stream", False)
         if stream:
             stream = can_stream
@@ -184,7 +185,7 @@ def scan(request: Dict[Any, Any]):
             conv_id
         )
 
-        res = conv.scan_script(script)
+        res = conv.scan_script(script, scanner)
         if len(res["vulnerabilities"]) > 0:
             params["vulnerabilities"] = res["vulnerabilities"]
             conv.append_chat(
