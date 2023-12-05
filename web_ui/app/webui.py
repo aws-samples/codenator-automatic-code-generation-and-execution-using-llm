@@ -612,6 +612,7 @@ def load_fn(
     
     if len(response["matches"]) > 0:
         ret = clear_fn()
+        ret[0].conv_id = response["conv_id"]
         ret[0].passed_security_scan = True
         ret[2] = response["matches"][0]["code"]
         ret[1] = [

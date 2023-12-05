@@ -6,6 +6,7 @@ css = """
 /* Gradio app */
 gradio-app{
  background-color:#eaeaea !important;
+ background-image:url("https://images.unsplash.com/photo-1633174524827-db00a6b7bc74?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3wzNTc5fDB8MXxzZWFyY2h8Mnx8YW1hem9ufGVufDB8fHx8MTcwMTc2MTE2Mnww&ixlib=rb-4.0.3&q=80&w=2560") !important;
 }
 /* Prose */
 #main-banner .svelte-1ed2p3z .prose{
@@ -102,10 +103,15 @@ gradio-app .gradio-container .main .wrap .contain .gap .stretch .gap .stretch .g
 gradio-app .gradio-container .main .wrap .contain .gap .stretch .gap .stretch .gap #script-group .styler .stretch .secondary{
  width:100px !important;
 }
+
+/* Tabitem */
+.contain .gap .tabitem{
+ background-color:#ffffff;
+}
 """
 welcome_message="""
 <a href="https://aws.amazon.com/what-is-cloud-computing"><img style="color:white; background-color: #232F3E;float: right;" src="https://d0.awsstatic.com/logos/powered-by-aws-white.png" alt="Powered by AWS Cloud Computing"></a>
-# <span style="color:white; background-color: #232F3E">Welcome to Codenator 🤖️.</span>
+# <span style="color:white; background-color: #232F3E">Welcome to Codenator 🤖️</span>
 ### <span style="color:white; background-color: #232F3E">Allow me to help you develop secure and robust code</span>
 """
 instructions="""
