@@ -2,7 +2,7 @@
 This component is responsible for implementing static security scan on generated script to detect any vulnerabilities. It currently supports scans powered by *Amazon CodeGuru* and *SemGrep*.
 
 ## IAM permissions for CodeGuru
-Using *Amazon CodeGuru` to scan code requires the following IAM permissions 
+Using *Amazon CodeGuru* to scan code requires the following IAM permissions 
 
 ```
 codeguru-security:CreateUploadUrl
@@ -12,7 +12,7 @@ codeguru-security:GetScan
 ```
 
 ## Starting the server
-To start API Layer server, you can use the below command:
+To start *Code Scanner* server, you can use the below command:
 ```
 $ main.py [optional args]
 ```
@@ -25,7 +25,7 @@ $ main.py [optional args]
 
 ## API endpoints
 
-Code scanner has the following API endpoints:
+*Code scanner* has the following API endpoints:
 - `/ping` (GET): A standard health check endpoint.
 - `/scan` (POST): Scan generated script.
     - Required parameters:<br>
