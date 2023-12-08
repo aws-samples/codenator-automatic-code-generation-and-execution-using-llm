@@ -1,5 +1,4 @@
 # Codenator 🤖️
----
 **Automatic code generation and execustion using Large Language Models**<br><br>
 Codenator is a scalible AWS cloud solution for generating, testing, scanning and executing code.
 ## Codenator in Action
