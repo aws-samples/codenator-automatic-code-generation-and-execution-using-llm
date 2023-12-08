@@ -1,6 +1,33 @@
-## SynthCodeX
+# Codenator 🤖️
+---
+**Automatic code generation and execustion using Large Language Models**<br><br>
+Codenator is a scalible AWS cloud solution for generating, testing, scanning and executing code.
+## Codenator in Action
+![Codenator demo](assets/codenator.gif)
+## Features
+It currently supports the following features:
+- LLM Agent interaction Code generation using Bedrock or models hosted on SageMaker endpoints.
+- Easy integration with new released models.
+- Code security scan with Amaazon CodeGuru or SemGrep.
+- Code execution in sandboxed docker container with encrypted input powered by Amazon KMS.
+- Automatic execution failure feedback and correction.
+- Code execution requires manual approval for increased security.
+- Task storage and retrieval powered by Amazon Opensearch Serverless, to allow interaction with a task at later time.
+- Shared storage folder to allow exchanging files between agent and code executor.
+## Architecture
+![Codenator Architecture](assets/codenator-architecture.png)
+Below is an overview description of each component. To dive deep into each one, click on the provided link for each componsent.
+* [API layer (LLM Service)](scr/codenator/api-layer/README.md): Responsible for unifing LLM invocations. It uses ECS Fragate and Amazon DynamoDB to interact with various LLM service providers and add new ones without the need to change code.
+* [Prompt Store](scr/codenator/controller/prompt/README.md): Powered by DynaoDB, enables storage, modification, versioning and retrieval of prompts at runtime.
+* [Controller (orchestration layer)](scr/codenator/controller/README.md): Holds the the main logic for the Codenator agent and acts as a central component for the solution.  
+* WebUI (UI layer): Gradio app web ui.
+* [Code Executor (task executor)](scr/codenator/code-executor/README.md): Executes code in sandbox, script must be encrypted with Amazon KMS. Currently supports Python, Java, JavaScript, R, Julia, Bash and Shell.
+* [Task store](scr/codenator/task-store/README.md): Powered by Amazon Opensearch Serverless, to save and retrieve tasks.
+* [Code scanner (Security Check/Guradrail)](scr/codenator/code-scanner/README.md): Performs static code scanning to detect any vulnerabilities in generated code. Currently supports Amazon CodeGuru and SemGrep scanners.
+* feedback: User feedback hosted on S3.
+* logging: Conversation logging to S3.
 
-Generate and test code using LLMs
+
 
 ## Security
 
