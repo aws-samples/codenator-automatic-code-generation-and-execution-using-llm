@@ -25,9 +25,9 @@ $ main.py [optional args]
 
 ## API endpoints
 
-Code executor has the following API endpoints:
+Code scanner has the following API endpoints:
 - `/ping` (GET): A standard health check endpoint.
-- `/scan` (POST): Execute encripted script.
+- `/scan` (POST): Scan generated script.
     - Required parameters:<br>
     `script`: script to scan.<br>
     `language`: programing language of the script.<br>
