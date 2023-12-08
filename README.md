@@ -16,18 +16,15 @@ It currently supports the following features:
 ## Architecture
 ![Codenator Architecture](assets/codenator-architecture.png)
 Below is an overview description of each component. To dive deep into each one, click on the provided link for each componsent.
-* [API layer (LLM Service)](scr/codenator/api-layer/README.md): Responsible for unifing LLM invocations. It uses ECS Fragate and Amazon DynamoDB to interact with various LLM service providers and add new ones without the need to change code.
-* [Prompt Store](scr/codenator/controller/prompt/README.md): Powered by DynaoDB, enables storage, modification, versioning and retrieval of prompts at runtime.
-* [Controller (orchestration layer)](scr/codenator/controller/README.md): Holds the the main logic for the Codenator agent and acts as a central component for the solution.  
+* [API layer (LLM Service)](src/codenator/api-layer/README.md): Responsible for unifing LLM invocations. It uses ECS Fragate and Amazon DynamoDB to interact with various LLM service providers and add new ones without the need to change code.
+* [Prompt Store](src/codenator/controller/prompt/README.md): Powered by DynaoDB, enables storage, modification, versioning and retrieval of prompts at runtime.
+* [Controller (orchestration layer)](src/codenator/controller/README.md): Holds the the main logic for the Codenator agent and acts as a central component for the solution.  
 * WebUI (UI layer): Gradio app web ui.
-* [Code Executor (task executor)](scr/codenator/code-executor/README.md): Executes code in sandbox, script must be encrypted with Amazon KMS. Currently supports Python, Java, JavaScript, R, Julia, Bash and Shell.
-* [Task store](scr/codenator/task-store/README.md): Powered by Amazon Opensearch Serverless, to save and retrieve tasks.
-* [Code scanner (Security Check/Guradrail)](scr/codenator/code-scanner/README.md): Performs static code scanning to detect any vulnerabilities in generated code. Currently supports Amazon CodeGuru and SemGrep scanners.
+* [Code Executor (task executor)](src/codenator/code-executor/README.md): Executes code in sandbox, script must be encrypted with Amazon KMS. Currently supports Python, Java, JavaScript, R, Julia, Bash and Shell.
+* [Task store](src/codenator/task-store/README.md): Powered by Amazon Opensearch Serverless, to save and retrieve tasks.
+* [Code scanner (Security Check/Guradrail)](src/codenator/code-scanner/README.md): Performs static code scanning to detect any vulnerabilities in generated code. Currently supports Amazon CodeGuru and SemGrep scanners.
 * feedback: User feedback hosted on S3.
 * logging: Conversation logging to S3.
-
-
-
 ## Security
 
 See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
