@@ -19,6 +19,6 @@ Code executor has the following API endpoints:
 - `/ping` (GET): A standard health check endpoint.
 - `list_kernel_specs` (GET): Lists all available kernels that can be used for execution
 - `/execute_code` (POST): Execute encripted script.
-     - Required parameters:
-        `code`: script encrypted with kms key.<br>
-        `kernel_name`: name of kernel to run the code<br>
+     - Required parameters:<br>
+     `code`: script encrypted with kms key.<br>
+     `kernel_name`: name of kernel to run the code<br>
