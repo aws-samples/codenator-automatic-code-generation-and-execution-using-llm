@@ -526,7 +526,7 @@ if __name__ == "__main__":
     parser.add_argument("--models-metadata-db", type=str, default="")
     parser.add_argument("--models-metadata-file", type=str, default="config/model_meta.json")
     parser.add_argument("--languages-file", type=str, default="config/languages.json")
-    parser.add_argument("--namespace", type=str, default="Codenator/task-store/")
+    parser.add_argument("--namespace", type=str, default="Codenator/controller/")
     parser.add_argument("--conv-bucket", type=str, default="")
     parser.add_argument("--conv-prefix", type=str, default="")
     args = parser.parse_args()
