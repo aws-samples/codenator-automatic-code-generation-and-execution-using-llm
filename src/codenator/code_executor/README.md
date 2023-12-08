@@ -3,7 +3,7 @@ As its name implies, this component is used to execute code generated from LLM, 
 A script is allowed to save or interact with fales in `tmp/` direcroty (`/opt/code/tmp/`)
 
 ## Starting the server
-To start API Layer server, you can use the below command:
+To start *Code Executor* server, you can use the below command:
 ```
 $ main.py [optional args]
 ```
@@ -15,7 +15,7 @@ $ main.py [optional args]
 
 ## API endpoints
 
-Code executor has the following API endpoints:
+*Code Executor* has the following API endpoints:
 - `/ping` (GET): A standard health check endpoint.
 - `list_kernel_specs` (GET): Lists all available kernels that can be used for execution
 - `/execute_code` (POST): Execute encripted script.
