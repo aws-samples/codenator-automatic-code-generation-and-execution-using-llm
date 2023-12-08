@@ -21,5 +21,5 @@ Code executor has the following API endpoints:
     - Required parameters:
         `script`: script to scan.<br>
         `language`: programing language of the script.<br>
-    - Optional parameters:
+    - Optional parameters:<br>
         `scanner`: defaults to `semgrep`. valid values `codeguru` or `semgrep`
