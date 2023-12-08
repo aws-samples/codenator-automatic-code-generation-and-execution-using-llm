@@ -21,7 +21,7 @@ $ main.py [optional args]
 `--host`: host url, default value `localhost`<br>
 `--port`: host port, default value `8080`<br>
 `--workers`: number of uvicorn workers, default value `3`<br>
-`--namespace`: namespace used to publish CloudWatc Metrics, default value `Codenator/api-layer/`<br>
+`--namespace`: namespace used to publish CloudWatc Metrics, default value `Codenator/code-scanner/`<br>
 
 ## API endpoints
 
