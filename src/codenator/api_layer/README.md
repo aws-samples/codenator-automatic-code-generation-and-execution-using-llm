@@ -1,5 +1,4 @@
 # API Layer
----
 API layer component unifies the way an LLM model is invoked to generate predictions. It is designed to run as a docker container that can access DynamoDB to retrieve model metadata. The aim is to enable users to add/remove models as they become available without the need to change any code or redeploy resources regardless of underlying service provider.
 
 We achieve that by inluding handler code in the handlers folder where each handler can resemble a service. When adding new handlers, some code needs to be added and the components needs to be redeployed.
