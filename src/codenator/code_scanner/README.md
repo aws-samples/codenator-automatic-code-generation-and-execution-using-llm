@@ -18,8 +18,8 @@ $ main.py [optional args]
 Code executor has the following API endpoints:
 - `/ping` (GET): A standard health check endpoint.
 - `/scan` (POST): Execute encripted script.
-    - Required parameters:
-        `script`: script to scan.<br>
-        `language`: programing language of the script.<br>
+    - Required parameters:<br>
+    `script`: script to scan.<br>
+    `language`: programing language of the script.<br>
     - Optional parameters:<br>
-        `scanner`: defaults to `semgrep`. valid values `codeguru` or `semgrep`
+    `scanner`: defaults to `semgrep`. valid values `codeguru` or `semgrep`
