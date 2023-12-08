@@ -1,6 +1,16 @@
 # Code Scanner
 This component is responsible for implementing static security scan on generated script to detect any vulnerabilities. It currently supports scans powered by *Amazon CodeGuru* and *SemGrep*.
 
+## IAM permissions for CodeGuru
+Using *Amazon CodeGuru` to scan code requires the following IAM permissions 
+
+```
+codeguru-security:CreateUploadUrl
+codeguru-security:CreateScan
+codeguru-security:GetFindings
+codeguru-security:GetScan
+```
+
 ## Starting the server
 To start API Layer server, you can use the below command:
 ```
