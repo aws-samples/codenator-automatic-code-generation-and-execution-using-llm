@@ -5,6 +5,13 @@ We achieve that by inluding handler code in the handlers folder where each handl
 
 However, for new models, we would only need to add model metadata to DynamoDB and it should allow us to use new models.
 
+## IAM permissions for *Amazon DynamoDB*
+*API Layer* requires the following IAM permissions:
+
+```
+dynamodb:GetItem
+```
+
 ## Starting the server
 To start API Layer server, you can use the below command:
 ```
