@@ -1,6 +1,6 @@
 # Code Executor
 As its name implies, this component is used to execute code generated from LLM, it requires permission to `kms:decrypt` action.
-A script is allowed to save or interact with fales in `tmp/` direcroty (`/opt/code/tmp/`)
+A script is allowed to save or interact with files in `tmp/` directory.
 
 ## Starting the server
 To start *Code Executor* server, you can use the below command:
