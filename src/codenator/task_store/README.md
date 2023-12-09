@@ -1,6 +1,15 @@
 # Task Store
 Task store can store generated tasks in *Amazon Opensearch Serverless` and retrieve them using an embedding a vecor and vector search
 
+
+## IAM permissions for *Amazon Opensearch Serverless*
+Using *Amazon Opensearch Serverless* to to store and load tasks requires the following IAM permissions 
+
+```
+aoss:ReadDocument
+aoss:WriteDocument
+```
+
 ## Starting the server
 To start *Task Store* server, you can use the below command:
 ```
