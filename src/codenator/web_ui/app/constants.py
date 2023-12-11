@@ -108,6 +108,11 @@ gradio-app .gradio-container .main .wrap .contain .gap .stretch .gap .stretch .g
 .contain .gap .tabitem{
  background-color:#ffffff;
 }
+
+/* Text Area */
+#script-group label textarea{
+ max-height:40px;
+}
 """
 welcome_message="""
 <a href="https://aws.amazon.com/what-is-cloud-computing"><img style="color:white; background-color: #232F3E;float: right;" src="https://d0.awsstatic.com/logos/powered-by-aws-white.png" alt="Powered by AWS Cloud Computing"></a>
