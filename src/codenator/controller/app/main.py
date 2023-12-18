@@ -40,6 +40,78 @@ def list_languages():
         tb = traceback.format_exc()
         logger.error(f"Error {e}\StackTrace: {tb}")
         return json.dumps({"error": e, "stacktrace": tb})
+    
+@app.post("/plan")
+def plan(request: Dict[Any, Any]):
+    start = time.perf_counter()
+    try:
+        params =request
+        req_params = [
+            "prompt",
+            "model_family",
+            "model_name",
+            "language"
+        ]
+        for req_param in req_params:
+            if req_param not in params:
+                return {"error": f"Request must contain [{req_param}] parameter."}
+        prompt = params.get("prompt")
+        model_params = params.get("model_params", {})
+        model_family = params.get("model_family")
+        model_name = params.get("model_name")
+        language = params.get("language")
+        model_type, can_stream = get_model_type(model_family, model_name)
+        model_type = params.get("model_type", model_type)
+        if model_type == "":
+            return {"error": f"Unknown model!\nmodel_family: {model_family}, model_name: {model_name}"}
+        stream = params.get("stream", False)
+        if stream:
+            stream = can_stream
+
+        LANGUAGES = get_languages()
+        params = {
+            "display_name": LANGUAGES[language]["display_name"],
+            "tag_name": LANGUAGES[language]["tag_name"],
+            "error_message": "",
+            "script_output": "",
+            "language_instructions": LANGUAGES[language]["language_instructions"]
+        }
+    
+        model_metadata = get_model_metadata(model_type)
+        prompt_store = get_prompt_store()
+        conv = Conversation(
+            model_metadata["ROLES"], 
+            prompt_store.get_prompt_from_template(
+                model_metadata["PLANNER_SYSTEM_PROMPT"],
+                params
+            ),
+            language,
+            model_family,
+            model_name,
+            model_metadata,
+            model_params,
+            ""
+        )
+        
+        conv.history += prompt
+        
+        res = conv.send_to_agent(stream)
+        if not res:
+            raise
+        if stream:            
+            return StreamingResponse(
+                res, 
+                media_type="application/x-ndjson"
+            )
+        else:
+            latency = int((time.perf_counter() - start) * 1000)
+            publish_metrics(latency)
+            return res
+    except Exception as e:
+        # Handle any exceptions that occur during execution
+        tb = traceback.format_exc()
+        logger.error(f"Error {e}\StackTrace: {tb}")
+        return {"error": str(e), "stacktrace": tb}
 
 @app.post("/generate")
 def generate(request: Dict[Any, Any]):

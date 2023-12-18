@@ -1,5 +1,3 @@
-out_tag = ["<output>", "/output>"]
-ex_out_tag = ["<expected_output>", "/expected_output>"]
 max_security_scan_retries = 3
 
 css = """
@@ -110,8 +108,13 @@ gradio-app .gradio-container .main .wrap .contain .gap .stretch .gap .stretch .g
 }
 
 /* Text Area */
+#chatbot-group label textarea{
+ max-height:42px;
+}
+
+/* Text Area */
 #script-group label textarea{
- max-height:40px;
+ max-height:42px;
 }
 """
 welcome_message="""
