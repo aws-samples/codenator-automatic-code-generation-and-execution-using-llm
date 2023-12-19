@@ -10,13 +10,15 @@ from constants import (
     welcome_message,
     instructions,
     output_err_msg,
-    output_wrn_msg,
     output_info_msg,
+    output_lines,
     scan_fail_msg,
     scan_pass_msg,
     scan_empty_msg,
     sec_out_err_msg,
     sec_out_info_msg,
+    sec_out_pass_msg,
+    sec_out_lines,
     files_path
 )
 
@@ -35,6 +37,7 @@ class ConvState:
         self.scan_retries = 0
         self.task = ""
         self.plan = ""
+        self.generating = False
     
     
 def scan_fn_with_stream(
@@ -50,23 +53,28 @@ def scan_fn_with_stream(
     top_p, 
     top_k
 ):
-    output = gr.Textbox(
-        value="",
-        label=sec_out_info_msg, 
-        elem_id="--primary-50", 
-        interactive=False, 
-        show_copy_button=True,
-        lines=7,
-        max_lines=7
-    )
-    history.append([None,"Security scan in progress ..."])
-    yield {
-        chatbot: history,
-        sec_out: output
-    }
-    del history[-1]
     if conv.conv_id != "":
-        if code != "" and conv.scan_retries < max_security_scan_retries and not conv.passed_security_scan:
+        conv.passed_security_scan = False
+        output = gr.Textbox(
+            value="",
+            label=sec_out_info_msg, 
+            elem_id="--primary-50", 
+            interactive=False, 
+            show_copy_button=True,
+            lines=sec_out_lines,
+            max_lines=sec_out_lines
+        )
+        yield {
+            sec_out: output
+        }
+        if code != "" and conv.scan_retries < max_security_scan_retries and not conv.generating:
+            history.append([None,"🤖️ Security scan in progress ..."])
+            conv.generating = True
+            yield {
+                state: conv,
+                chatbot: history
+            }
+            del history[-1]
             data = json.dumps(
                 {
                     "script": code,
@@ -109,8 +117,8 @@ def scan_fn_with_stream(
                             value=json_obj["vulnerabilities"],
                             label=sec_out_err_msg, 
                             elem_id="red",
-                            lines=7,
-                            max_lines=7
+                            lines=output_lines,
+                            max_lines=output_lines
                         )
                         code = json_obj["script"]
 
@@ -136,20 +144,41 @@ def scan_fn_with_stream(
                             sec_out: output
                         }
                     else:
+                        output = gr.Textbox(
+                            value="",
+                            label=sec_out_pass_msg, 
+                            elem_id="green",
+                            lines=sec_out_lines,
+                            max_lines=sec_out_lines
+                        )
                         scan_status = scan_pass_msg
                         conv.scan_retries = 0
                         conv.passed_security_scan = True
                         yield {
-                            state: conv
+                            state: conv,
+                            sec_out: output
                         }            
             history[-1][1] = history[-1][1].rstrip("▌")
+            conv.generating = False
+    else:
+        output = gr.Textbox(
+            value="",
+            label=sec_out_info_msg, 
+            elem_id="--primary-50", 
+            interactive=False, 
+            show_copy_button=True,
+            lines=sec_out_lines,
+            max_lines=sec_out_lines
+        )
     ret = {
         chatbot: history, 
         scan_stat: scan_status,
-        sec_out:output
+        sec_out:output,
+        state: conv
     }
     if not conv.passed_security_scan:
         ret[script] = code
+    
     yield ret
 
 def scan_fn(
@@ -165,22 +194,22 @@ def scan_fn(
     top_p, 
     top_k
 ):
-    output = gr.Textbox(
-        value="",
-        label=sec_out_info_msg, 
-        elem_id="--primary-50", 
-        interactive=False, 
-        show_copy_button=True,
-        lines=7,
-        max_lines=7
-    )
-    history.append([None,"Security scan in progress ..."])
-    yield {
-        chatbot: history,
-        sec_out: output
-    }
-    del history[-1]
     if conv.conv_id != "":
+        output = gr.Textbox(
+            value="",
+            label=sec_out_info_msg, 
+            elem_id="--primary-50" if not conv.passed_security_scan else "green", 
+            interactive=False, 
+            show_copy_button=True,
+            lines=sec_out_lines,
+            max_lines=sec_out_lines
+        )
+        history.append([None,"Security scan in progress ..."])
+        yield {
+            chatbot: history,
+            sec_out: output
+        }
+        del history[-1]
         if code != "" and conv.scan_retries < max_security_scan_retries and not conv.passed_security_scan:
             data = json.dumps(
                 {
@@ -210,8 +239,8 @@ def scan_fn(
                     value=response["vulnerabilities"],
                     label=sec_out_err_msg,
                     elem_id="red",
-                    lines=7,
-                    max_lines=7
+                    lines=output_lines,
+                    max_lines=output_lines
                 )
                 history.append(["Securit scan produced shown recommendations.", response["generated_text"]])
                 code = response["script"]
@@ -222,6 +251,13 @@ def scan_fn(
                     scan_stat: scan_fail_msg
                 }
             else:
+                output = gr.Textbox(
+                            value="",
+                            label=sec_out_pass_msg, 
+                            elem_id="green",
+                            lines=sec_out_lines,
+                            max_lines=sec_out_lines
+                        )
                 conv.scan_retries = 0
                 conv.passed_security_scan = True
                 yield {
@@ -273,8 +309,8 @@ def execute_fn(
             value=response["output"],
             label=output_err_msg,
             elem_id="red",
-            lines=12,
-            max_lines=12
+            lines=output_lines,
+            max_lines=output_lines
         )
         history.append(["The script failed with shown error message", response["generated_text"]])
         code = response["script"]
@@ -285,8 +321,8 @@ def execute_fn(
             elem_id="--primary-50",
             interactive=False,
             show_copy_button=True,
-            lines=12,
-            max_lines=12
+            lines=output_lines,
+            max_lines=output_lines
         )
     images = []
     if "files" in json_obj:
@@ -315,7 +351,7 @@ def execute_fn_with_stream(
     top_p, 
     top_k
 ):
-    history.append([None,"Executing script ..."])
+    history.append([None,"🤖️ Executing script ..."])
     yield {
         chatbot: history
     }
@@ -343,6 +379,10 @@ def execute_fn_with_stream(
     )
     images = []
     flag = True
+    conv.generating = True
+    yield {
+        state: conv
+    }
     for chunk in response.iter_lines():
         if chunk != b'':
             json_obj = json.loads(chunk)
@@ -358,8 +398,8 @@ def execute_fn_with_stream(
                     value=json_obj["output"],
                     label=output_err_msg,
                     elem_id="red",
-                    lines=12,
-                    max_lines=12
+                    lines=output_lines,
+                    max_lines=output_lines
                 )
                 if flag:
                     history.append(
@@ -383,22 +423,25 @@ def execute_fn_with_stream(
                     elem_id="--primary-50", 
                     interactive=False, 
                     show_copy_button=True,
-                    lines=12,
-                    max_lines=12
+                    lines=output_lines,
+                    max_lines=output_lines
                 )
             yield {
+                state: conv,
                 chatbot: history,
                 out: output,
-                script: code,
+                # script: code,
                 image: images
             }
     history[-1][1] = history[-1][1].rstrip("▌")
+    conv.generating = False
     yield {
-            chatbot: history,
-            out: output,
-            script: code,
-            image: images
-        }
+        state: conv,
+        chatbot: history,
+        out: output,
+        script: code,
+        image: images
+    }
 
 def generate_response_with_stream(
     conv: gr.State, 
@@ -409,8 +452,12 @@ def generate_response_with_stream(
     temprature, 
     top_p, 
     top_k
-): 
-
+):
+    history.append([None, "🤖️ Generating response ..." ])
+    yield {
+        chatbot: history
+    }
+    del history[-1]
     conv.passed_security_scan = False
     conv.scan_retries = 0
     prompt = history[-1][0]
@@ -436,7 +483,10 @@ def generate_response_with_stream(
         data=data,
         stream=stream
     )
-    
+    conv.generating = True
+    yield {
+        state: conv
+    }
     for chunk in response.iter_lines():
         if chunk != b'':
             json_obj = json.loads(chunk)
@@ -463,7 +513,7 @@ def generate_response_with_stream(
     
     history[-1][1] = last_response
     conv.conv_id = json_obj.get("conv_id", "")
-    
+    conv.generating = False
     yield {
         state: conv,
         chatbot: history,
@@ -479,8 +529,7 @@ def generate_response(
     temprature, 
     top_p, 
     top_k
-): 
-
+):
     conv.passed_security_scan = False
     conv.scan_retries = 0
     prompt = history[-1][0]
@@ -531,11 +580,12 @@ def plan_fn(
         conv.passed_security_scan = False
         conv.scan_retries = 0
         conv.task = history[0][0]
-        history[0][1] = "Brainstorming and meditating ..." 
+        history[0][1] = "🤖️ Brainstorming and meditating ..." 
         yield {
             state: conv,
             chatbot: history
         }
+        history[0][1] = None
         data = json.dumps(
             {
                 "prompt": history[-1][0],
@@ -566,7 +616,6 @@ def plan_fn(
         res = response["generated_text"]
         conv.conv_id = ""
         conv.plan = res
-        history[0][1] = "Generating script ..." 
     yield {
         state: conv,
         chatbot: history
@@ -655,6 +704,13 @@ def load_fn(
     # gr.Info(response[0]["task_desc"])
     # [state, chatbot, script, out, image, sec_out, load_box, scan_stat]
     if len(response["matches"]) > 0:
+        ret[5] = gr.Textbox(
+            value="",
+            label=sec_out_pass_msg, 
+            elem_id="green",
+            lines=sec_out_lines,
+            max_lines=sec_out_lines
+        )
         ret = clear_fn()
         ret[0].conv_id = response["conv_id"]
         ret[0].passed_security_scan = True
@@ -671,7 +727,7 @@ def load_fn(
     return ret + [""] + [scan_empty_msg]
 
 def can_exec(conv, code):
-    if code != "" and conv.passed_security_scan:
+    if code != "" and conv.passed_security_scan and not conv.generating:
         return (
             gr.update(interactive=True),
             gr.update(interactive=True)
@@ -712,16 +768,16 @@ def clear_fn():
         elem_id="--primary-50", 
         interactive=False, 
         show_copy_button=True, 
-        lines=12, 
-        max_lines=12
+        lines=output_lines, 
+        max_lines=output_lines
     )] + [[]] + [gr.Textbox(
         value="",
         label=sec_out_info_msg, 
         elem_id="--primary-50", 
         interactive=False, 
         show_copy_button=True, 
-        lines=7, 
-        max_lines=7
+        lines=sec_out_lines, 
+        max_lines=sec_out_lines
     ), "", scan_empty_msg]
 
 def vote(data: gr.LikeData, conv):
@@ -731,7 +787,8 @@ def vote(data: gr.LikeData, conv):
         print("You downvoted this response: " + data.value)   
 
 def add_text(message, history):
-    history += [[message, None]]
+    if message != "":
+        history += [[message, None]]
     return ["", history]
 
 def web_ui():
@@ -745,71 +802,81 @@ def web_ui():
         state = gr.State(ConvState())
         gr.Markdown(welcome_message, elem_id="main-banner")
         with gr.Row():
-            with gr.Column(scale=8):
-                with gr.Row(equal_height=True):
-                    with gr.Column(scale=4):
-                        with gr.Group(elem_id="chatbot-group"):
-                            with gr.Row():
-                                chatbot = gr.Chatbot(elem_id="chatbot-window", show_copy_button=True, height=450)
-                            with gr.Row():
+            with gr.Column(scale=6):
+                with gr.Tab("Chatbot"):
+                    with gr.Group(elem_id="chatbot-group"):
+                        with gr.Row():
+                            chatbot = gr.Chatbot(elem_id="chatbot-window", show_copy_button=True, height=450)
+                        with gr.Row():                                
+                            with gr.Column(scale=8): 
                                 textbox = gr.Textbox(
                                     show_label=False, 
                                     placeholder="Enter your prompt here and press ENTER", 
                                     container=False, 
                                     scale=16
                                 )
+                            with gr.Column(scale=1):
                                 submit = gr.Button(
-                                    value="💬️", 
-                                    variant="primary", 
-                                    scale=2, 
-                                    elem_id="chatbot-button"
+                                    value="Submit 💬️", 
+                                    variant="primary",
+                                    elem_id="chatbot-button",
+                                    interactive=False
                                 )
                                 clear_btn = gr.ClearButton(
-                                    value="🗑️", 
-                                    scale=1, 
+                                    value="Clear 🗑️",
                                     elem_id="chatbot-button"
                                 )
-                        out = gr.Textbox(
-                            value="",
-                            label=output_info_msg,
-                            interactive=False,
-                            show_copy_button=True,
-                            lines=12,
-                            max_lines=12
-                        )
-                    with gr.Column(scale=3):
-                        with gr.Group(elem_id="script-group"):
-                            script = gr.Code(value="",label="Script", language = l_mapping[languages[0]], interactive=False, lines=16)
-                            scan_stat = gr.Markdown(scan_empty_msg)
-                            with gr.Row():
-                                load_box = gr.Textbox(
-                                    show_label=False,
-                                    placeholder="Enter detailed task description to load.",
-                                    scale=30,
-                                    container=False
-                                )
-                                load = gr.Button(variant="primary", value="Load", scale=1)
-                                save = gr.Button(value="Save 💾️", interactive=False, scale=1)
-                                execute = gr.Button(value="Execute", interactive=False, variant="primary", scale=1)
-                        image = gr.Gallery(label="Image", show_download_button=True, preview=True, object_fit="fill", selected_index=0)
-
-                with gr.Accordion(label="Other Outputs", open=False):
-                    sec_out = gr.Textbox(value="",label=sec_out_info_msg, interactive=False, lines=7, max_lines=7)
-                    
-            with gr.Column(scale=1):
-                with gr.Tab("Instructions"):
-                    gr.Markdown(instructions)
+                                execute = gr.Button(value="Execute", interactive=False, variant="primary")
                 with gr.Tab("Properties"):
-                    language = gr.Dropdown(languages,label='Programing Langauge', value=languages[0])
-                    model = gr.Dropdown(models_list.keys(),label="LLM Model", value=list(models_list.keys())[0])
-                    temprature = gr.Slider(label="Temprature", step=0.1, minimum=0, maximum=1, value=0.1)
-                    top_p = gr.Slider(label="Top_p", step=0.1, minimum=0, maximum=1, value=0.1)
-                    top_k = gr.Slider(label="Top_k", step=1, minimum=1, maximum=500, value=5)
+                    with gr.Row():
+                        with gr.Column():
+                            language = gr.Dropdown(languages,label='Programing Langauge', value=languages[0])
+                        with gr.Column():
+                            model = gr.Dropdown(models_list.keys(),label="LLM Model", value=list(models_list.keys())[0])
+                    with gr.Row():
+                        with gr.Column():
+                            temprature = gr.Slider(label="Temprature", step=0.1, minimum=0, maximum=1, value=0)
+                        with gr.Column():
+                            top_p = gr.Slider(label="Top_p", step=0.1, minimum=0, maximum=1, value=0)
+                        with gr.Column():
+                            top_k = gr.Slider(label="Top_k", step=1, minimum=1, maximum=500, value=5)
                     streaming = gr.Checkbox(label='Stream chat response', value=True)
                     embed_model = gr.Dropdown(embedding_models_list.keys(),label="Embedding Model", value=list(embedding_models_list.keys())[0])                    
                     threshold = gr.Slider(label="Loading Match Threshold", step=0.05, minimum=0.05, maximum=1.00, value=0.30)
                     scanner = gr.Dropdown(scanners_list.keys(),label="Security Scanner", value=list(scanners_list.keys())[0])
                     timeout = gr.Number(label="Execution Timeout", precision=0, minimum=10, maximum=3600, value=30)
+                with gr.Tab("Help"):
+                    gr.Markdown(instructions)
+
+            with gr.Column(scale=4):
+                with gr.Tab("Outputs"):
+                    out = gr.Textbox(
+                        value="",
+                        label=output_info_msg,
+                        interactive=False,
+                        show_copy_button=True,
+                        lines=output_lines,
+                        max_lines=output_lines
+                    )
+                    sec_out = gr.Textbox(value="",label=sec_out_info_msg, interactive=False, lines=sec_out_lines, max_lines=sec_out_lines) 
+
+                with gr.Tab("Plots and Images"):
+                    image = gr.Gallery(label="Image", show_download_button=True, preview=True, object_fit="fill", selected_index=0)
+                with gr.Tab("Current Script"):
+                    with gr.Group(elem_id="script-group"):
+                        script = gr.Code(value="",label="Script", language = l_mapping[languages[0]], interactive=False, lines=16)
+                        scan_stat = gr.Markdown(scan_empty_msg)
+                        with gr.Row():
+                            with gr.Column(scale=2):
+                                load_box = gr.Textbox(
+                                    show_label=False,
+                                    placeholder="Enter detailed task description to load.",
+                                    container=False
+                                )
+                            with gr.Column(scale=1):
+                                load = gr.Button(variant="primary", value="Load", interactive=False)
+                                save = gr.Button(value="Save 💾️", interactive=False)
+                
             
         language.change(change_language, [language], [state, chatbot, script, out, image], queue=False)
         model.change(change_model, None, [state, chatbot, script, out, image], queue=False)
@@ -833,6 +900,20 @@ def web_ui():
             [state, chatbot, script],
             show_progress=False,
             queue=streaming.value
+        )
+        
+        textbox.change(
+            lambda x: {submit: gr.update(interactive=True)} if x != "" else {submit: gr.update(interactive=False)},
+            [textbox],
+            [submit],
+            show_progress=False
+        )
+        
+        load_box.change(
+            lambda x: {load: gr.update(interactive=True)} if x != "" else {load: gr.update(interactive=False)},
+            [load_box],
+            [load],
+            show_progress=False
         )
         
         script.change(
@@ -863,7 +944,7 @@ def web_ui():
         ).then(            
             execute_fn_with_stream if streaming.value else execute_fn, 
             [state, chatbot, script, model, language, timeout, streaming, temprature, top_p, top_k], 
-            [chatbot, out, script, image],
+            [state, chatbot, out, script, image],
             show_progress=False,
             queue=streaming
         )
@@ -897,4 +978,4 @@ def get_languages_list(url):
 if __name__ == "__main__":
     languages = get_languages_list(controller_url)
     UI = web_ui()
-    UI.queue(status_update_rate=10, api_open=False).launch(debug=False, max_threads=200)
+    UI.queue(status_update_rate=10, api_open=False).launch(debug=False, max_threads=output_lines0)
