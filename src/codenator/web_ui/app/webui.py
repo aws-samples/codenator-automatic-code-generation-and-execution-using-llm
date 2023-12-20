@@ -434,6 +434,11 @@ def execute_fn_with_stream(
                 image: images
             }
     history[-1][1] = history[-1][1].rstrip("▌")
+    if len(images) > 0:
+        image_count = min(2, len(images))
+        for count in range(image_count):
+            history.append([None, (images[count],)])
+        history.append([None, "Only displaying maximum of 2 images in the chat. You can find all images in **Plots and Images** tab ..."])
     conv.generating = False
     yield {
         state: conv,
