@@ -14,7 +14,7 @@ It currently supports the following features:
 - Task storage and retrieval powered by *Amazon Opensearch Serverless*, to allow interaction with a task at later time.
 - Shared storage folder to allow exchanging files between agent and code executor.
 ## Architecture
-![Codenator Architecture](assets/codenator-architecture.png)
+![Codenator Architecture](assets/codenator-architecture.png)<br>
 Below is an overview description of each component. To dive deep into each one, click on the provided link for each componsent.
 * [API layer (LLM Service)](src/codenator/api_layer/README.md): Responsible for unifing LLM invocations. It uses *ECS Fragate* and *Amazon DynamoDB* to interact with various LLM service providers and add new ones without the need to change code.
 * [Prompt Store](src/codenator/controller/app/prompt/README.md): Powered by *DynamoDB*, enables storage, modification, versioning and retrieval of prompts at runtime.
