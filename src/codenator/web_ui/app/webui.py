@@ -117,8 +117,8 @@ def scan_fn_with_stream(
                             value=json_obj["vulnerabilities"],
                             label=sec_out_err_msg, 
                             elem_id="red",
-                            lines=output_lines,
-                            max_lines=output_lines
+                            lines=sec_out_lines,
+                            max_lines=sec_out_lines
                         )
                         code = json_obj["script"]
 
@@ -239,8 +239,8 @@ def scan_fn(
                     value=response["vulnerabilities"],
                     label=sec_out_err_msg,
                     elem_id="red",
-                    lines=output_lines,
-                    max_lines=output_lines
+                    lines=sec_out_lines,
+                    max_lines=sec_out_lines
                 )
                 history.append(["Securit scan produced shown recommendations.", response["generated_text"]])
                 code = response["script"]
