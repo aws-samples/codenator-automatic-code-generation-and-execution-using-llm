@@ -76,7 +76,7 @@ css_output = """
 /* Block */
 #script-group .gap .block{
  min-width:4px !important;
- width:408px;
+ width:100% !important;
  height:123px;
 }
 
