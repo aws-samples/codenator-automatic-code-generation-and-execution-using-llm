@@ -1,0 +1,67 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  This template creates the infrastructure required to deploy Codenator
+Parameters:
+  ProjectName:
+    AllowedPattern: '[A-Za-z0-9-]{1,16}'
+    ConstraintDescription: >-
+      Maximum of 22 alphanumeric characters. Can include hyphens (-), but not
+      spaces. Must be unique within your account in an AWS Region.
+    Description: Project Name used to identify your resources
+    MaxLength: '16'
+    MinLength: '1'
+    Type: String
+    Default: codenator
+  VpcCIDR:
+    Type: String
+    Default: 10.2.0.0/16
+  PublicSubnetCIDRA:
+    Type: String
+    Default: 10.2.0.0/24
+  PrivateSubnetCIDRA:
+    Type: String
+    Default: 10.2.2.0/24
+  PublicSubnetCIDRB:
+    Type: String
+    Default: 10.2.3.0/24
+  PrivateSubnetCIDRB:
+    Type: String
+    Default: 10.2.1.0/24
+  ProjectBucket:
+    Type: String
+    Default: codenator-dev-00
+  PromptStoreTableName:
+    Type: String
+    Default: "prompt-store"
+  APILayerTableName:
+    Type: String
+    Default: "model-db"
+  Certificate:
+    Type: String
+    # Update with the certificate ARN from Certificate Manager, which must exist in the same region.
+    Default: 'arn:aws:acm:region:123456789012:certificate/00000000-0000-0000-0000-000000000000'
+  VPCTemplate:
+    Type: String
+    Default: https://codenator-dev-00.s3.us-west-2.amazonaws.com/codenator/CFN/vpc-template.yaml
+  PSTemplate:
+    Type: String
+    Default: https://codenator-dev-00.s3.us-west-2.amazonaws.com/codenator/CFN/prompt-store.yaml
+Resources:
+  VPCStack:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Ref VPCTemplate
+      Parameters:
+        ProjectName: !Ref ProjectName
+        VpcCIDR: !Ref VpcCIDR
+        PublicSubnetCIDRA: !Ref PublicSubnetCIDRA
+        PrivateSubnetCIDRA: !Ref PrivateSubnetCIDRA
+        PublicSubnetCIDRB: !Ref PublicSubnetCIDRB
+        PrivateSubnetCIDRB: !Ref PrivateSubnetCIDRB
+  PromptStoreStack:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Ref PSTemplate
+      Parameters:
+        DataBucket: !Ref ProjectBucket
+        TableName: !Ref PromptStoreTableName

@@ -1,0 +1,74 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  This template builds ECR images for Codenator
+Parameters:
+  ProjectName:
+    AllowedPattern: '[A-Za-z0-9-]{1,16}'
+    ConstraintDescription: >-
+      Maximum of 22 alphanumeric characters. Can include hyphens (-), but not
+      spaces. Must be unique within your account in an AWS Region.
+    Description: Project Name used to identify your resources
+    MaxLength: '16'
+    MinLength: '1'
+    Type: String
+    Default: codenator
+  SourceRepo:
+    Type: String
+  ImageBuildTemplate:
+    Type: String
+    Default: https://codenator-dev-00.s3.us-west-2.amazonaws.com/codenator/CFN/single-image-build.yaml
+Resources:
+  CodeBuildPushDockerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['', [!Ref ProjectName, CodeBuildPushDockerRole]]
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+                - codepipeline.amazonaws.com
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: !Join ['', [!Ref ProjectName, CodeBuildPushDockerPolicy]]
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreatelogStream
+                  - logs:PutLogEvents
+                  - ecr:GetAuthorizationToken
+                  - ecr:DescribeRepositories
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:CompleteLayerUpload
+                  - ecr:InitiateLayerUpload
+                  - ecr:PutImage
+                  - ecr:UploadLayerPart
+                  - ecr:BatchDeleteImage
+                  - ecr:ListImages
+                  - s3:*
+                  - codecommit:*
+                  - lambda:*
+                  - codebuild:*
+                  - ssm:DescribeParameters
+                  - ssm:DeleteParameters
+                Resource: "*"
+  APILayerImage:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Ref ImageBuildTemplate
+      Parameters:
+        ProjectName: !Ref ProjectName
+        ECRRepoName: 'api_layer'
+        SourceRepo: !Ref SourceRepo
+        CodeBuildPushDockerRole: !GetAtt CodeBuildPushDockerRole.Arn
+
+Outputs:
+  CodeBuildRole:
+    Value: !Ref CodeBuildPushDockerRole
