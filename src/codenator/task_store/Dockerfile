@@ -1,4 +1,4 @@
-FROM python:3.10-slim
+FROM public.ecr.aws/docker/library/python:3.10-slim
 
 RUN python3 -m pip install uvicorn fastapi -U -q
 WORKDIR /code/app
