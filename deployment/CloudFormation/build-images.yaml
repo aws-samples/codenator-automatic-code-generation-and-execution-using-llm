@@ -68,7 +68,51 @@ Resources:
         ECRRepoName: 'api_layer'
         SourceRepo: !Ref SourceRepo
         CodeBuildPushDockerRole: !GetAtt CodeBuildPushDockerRole.Arn
-
+  CodeExecImage:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Ref ImageBuildTemplate
+      Parameters:
+        ProjectName: !Ref ProjectName
+        ECRRepoName: 'code_executor'
+        SourceRepo: !Ref SourceRepo
+        CodeBuildPushDockerRole: !GetAtt CodeBuildPushDockerRole.Arn
+  CodeScanImage:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Ref ImageBuildTemplate
+      Parameters:
+        ProjectName: !Ref ProjectName
+        ECRRepoName: 'code_scanner'
+        SourceRepo: !Ref SourceRepo
+        CodeBuildPushDockerRole: !GetAtt CodeBuildPushDockerRole.Arn
+  ControllerImage:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Ref ImageBuildTemplate
+      Parameters:
+        ProjectName: !Ref ProjectName
+        ECRRepoName: 'controller'
+        SourceRepo: !Ref SourceRepo
+        CodeBuildPushDockerRole: !GetAtt CodeBuildPushDockerRole.Arn
+  TaskStoreImage:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Ref ImageBuildTemplate
+      Parameters:
+        ProjectName: !Ref ProjectName
+        ECRRepoName: 'task_store'
+        SourceRepo: !Ref SourceRepo
+        CodeBuildPushDockerRole: !GetAtt CodeBuildPushDockerRole.Arn
+  WebUiImage:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Ref ImageBuildTemplate
+      Parameters:
+        ProjectName: !Ref ProjectName
+        ECRRepoName: 'web_ui'
+        SourceRepo: !Ref SourceRepo
+        CodeBuildPushDockerRole: !GetAtt CodeBuildPushDockerRole.Arn
 Outputs:
   CodeBuildRole:
     Value: !Ref CodeBuildPushDockerRole
