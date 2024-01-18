@@ -14,6 +14,8 @@ Parameters:
     Default: codenator
   KMSKeyArn:
     Type: String
+  ModelDBArn:
+    Type: String
 Resources:
   ECSExecutionRole:
     Type: AWS::IAM::Role
@@ -49,8 +51,13 @@ Resources:
                   - "sagemaker:InvokeEndpoint*"
                   - "bedrock:InvokeModel*"
                   - "logs:PutMetricData"
-                  - "dynamodb:GetItem"
                 Resource: "*"
+              - 
+                Effect: "Allow"
+                Action:
+                  - "dynamodb:GetItem"
+                Resource: !Ref ModelDBArn
+                
   CodeExecTaskRole:
     Type: AWS::IAM::Role
     Properties:
@@ -106,7 +113,7 @@ Resources:
 Outputs:
   ECSExecutionRole:
     Value: !GetAtt ECSExecutionRole.Arn
-  APITaskRole:
+  APILayerTaskRole:
     Value: !GetAtt APILayerTaskRole.Arn
   CodeExecTaskRole:
     Value: !GetAtt CodeExecTaskRole.Arn

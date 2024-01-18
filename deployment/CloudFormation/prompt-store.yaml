@@ -34,3 +34,6 @@ Resources:
         S3BucketSource:
           S3Bucket: !Ref DataBucket
           S3KeyPrefix: !Ref DataPrefix
+Outputs:
+  DDBTableArn:
+    Value: !GetAtt DDBTable.Arn

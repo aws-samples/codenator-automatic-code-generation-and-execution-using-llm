@@ -70,8 +70,8 @@ Resources:
             - !Ref AppPort
             - "--kms"
             - !Ref KMSKey
-            - "--namespace"
-            - !Sub "${ProjectName}/${AppName}/"
+            # - "--namespace"
+            # - !Sub "${ProjectName}/${AppName}/"
           Environment:
             - Name: AWS_DEFAULT_REGION
               Value: !Ref AWS::Region
@@ -125,7 +125,7 @@ Resources:
       HealthCheckTimeoutSeconds: 5
       UnhealthyThresholdCount: 2
       HealthyThresholdCount: 2
-      Name: !Join ['', [!Ref ProjectName, '-', !Ref AppName, -TargetGroup]]
+      Name: !Join ['', [!Ref AppName, -TargetGroup]]
       Port: !Ref AppPort
       Protocol: HTTP
       TargetGroupAttributes:
@@ -149,7 +149,7 @@ Resources:
         # this is the default, but is specified here in case it needs to be changed
         - Key: idle_timeout.timeout_seconds
           Value: 60
-      Name: !Join ['', [!Ref ProjectName, '-', !Ref AppName, '-LoadBalancer']]
+      Name: !Join ['', [!Ref AppName, '-LoadBalancer']]
       Scheme: internal
       SecurityGroups:
         - !Ref LoadBalancerSecurityGroup

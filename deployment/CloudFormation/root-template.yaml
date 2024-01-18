@@ -66,6 +66,7 @@ Resources:
       Parameters:
         ProjectName: !Ref ProjectName
         KMSKeyArn: !GetAtt KMSKey.Arn
+        ModelDBArn: !GetAtt ModelDBStack.Outputs.DDBTableArn
   PromptStoreStack:
     Type: 'AWS::CloudFormation::Stack'
     Properties:
@@ -97,7 +98,7 @@ Resources:
           - Sid: Enable IAM User Permissions
             Effect: Allow
             Principal:
-              AWS: !Join ['',['arn:aws:iam::', !Ref AWS:AccountId, ':root']]
+              AWS: !Join ['',['arn:aws:iam::', !Ref AWS::AccountId, ':root']]
             Action: 'kms:*'
             Resource: '*'
   KMSAlias:
