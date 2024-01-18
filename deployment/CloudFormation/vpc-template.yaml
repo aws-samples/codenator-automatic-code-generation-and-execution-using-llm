@@ -27,6 +27,9 @@ Parameters:
   PrivateSubnetCIDRB:
     Type: String
     Default: 10.2.3.0/24
+  AppPort:
+    Type: String
+    Default: 8080
 Resources:
   VPC:
     Type: 'AWS::EC2::VPC'
@@ -138,20 +141,37 @@ Resources:
     Properties:
       SubnetId: !Ref PrivateSubnetB
       RouteTableId: !Ref PrivateRouteTable
-  SecurityGroup:
-    Type: 'AWS::EC2::SecurityGroup'
+  AppSG:
+    Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: security group for SageMaker Model
+      GroupDescription: !Join ['', [!Ref ProjectName, AppSG]]
       VpcId: !Ref VPC
-      Tags:
-        - Key: Name
-          Value: !Sub '${ProjectName}-model-security-group'
-  SecurityGroupIngress:
-    Type: 'AWS::EC2::SecurityGroupIngress'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref AppPort
+          ToPort: !Ref AppPort
+          SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+  APILayerSGIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    DependsOn: 
+      - AppSG
     Properties:
-      IpProtocol: '-1'
-      GroupId: !Ref SecurityGroup
-      SourceSecurityGroupId: !Ref SecurityGroup
+      GroupId: !Ref AppSG
+      IpProtocol: tcp
+      FromPort: !Ref AppPort
+      ToPort: !Ref AppPort
+      SourceSecurityGroupId: !Ref AppSG
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Join ['', [!Ref ProjectName, LoadBalancerSecurityGroup]]
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref AppPort
+          ToPort: !Ref AppPort
+          CidrIp: 0.0.0.0/0
+
 
 Outputs:
   VpcID:
@@ -164,5 +184,7 @@ Outputs:
     Value: !Ref PublicSubnetB
   PrivateSubnetB:
     Value: !Ref PrivateSubnetB
-  SecurityGroup:
-    Value: !Ref SecurityGroup
+  AppSecurityGroup:
+    Value: !Ref AppSG
+  LoadBalancerSecurityGroup:
+    Value: !Ref LoadBalancerSecurityGroup

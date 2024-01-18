@@ -25,7 +25,33 @@ Resources:
             Action: 'sts:AssumeRole'
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+  APILayerTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['', [!Ref ProjectName, TaskRole]]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies: 
+        - 
+          PolicyName: "SageMakerInvokePermissions"
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - 
+                Effect: "Allow"
+                Action:
+                  - "sagemaker:InvokeEndpoint*"
+                  - "bedrock:InvokeModel*"
+                  - "logs:PutMetricData"
+                  - "dynamodb:GetItem"
+                Resource: "*"
 
 Outputs:
   ECSExecutionRole:
     Value: !GetAtt ECSExecutionRole.Arn
+  APILayerTaskRole:
+    Value: !GetAtt APILayerTaskRole.Arn

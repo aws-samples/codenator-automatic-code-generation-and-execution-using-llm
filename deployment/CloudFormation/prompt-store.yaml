@@ -8,7 +8,7 @@ Parameters:
     Default: "codenator-dev-00"
   DataPrefix:
     Type: String
-    Default: "codenator/CFN/data/prompt_store.csv"
+    Default: "codenator/CFN/data/prompt_store.json"
 Resources:
   DDBTable:
     Type: AWS::DynamoDB::Table
@@ -30,7 +30,7 @@ Resources:
         SSEEnabled: False
       ImportSourceSpecification:
         InputCompressionType: "NONE"
-        InputFormat: "CSV"
+        InputFormat: "DYNAMODB_JSON"
         S3BucketSource:
           S3Bucket: !Ref DataBucket
           S3KeyPrefix: !Ref DataPrefix

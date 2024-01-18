@@ -3,25 +3,15 @@ Description: Deploying apps on Fargate.
 Parameters:
   VPC:
     Type: String
-  PublicSubnetA:
-    Type: String
-  PublicSubnetB:
-    Type: String
   PrivateSubnetA:
     Type: String
   PrivateSubnetB:
     Type: String
-  Certificate:
-    Type: String
-    # Update with the certificate ARN from Certificate Manager, which must exist in the same region.
-    Default: 'arn:aws:acm:region:123456789012:certificate/00000000-0000-0000-0000-000000000000'
   ProjectName:
     Type: String
   AppName:
     Type: String
     Default: api-layer
-  AppImage:
-    Type: String
   AppPort:
     Type: Number
     Default: 8080
@@ -35,6 +25,10 @@ Parameters:
   ExecutionRoleArn:
     Type: String
   TaskRoleArn:
+    Type: String
+  APILayerSG:
+    Type: String
+  LoadBalancerSecurityGroup:
     Type: String
 Resources:
   AppTaskDef:
@@ -68,33 +62,27 @@ Resources:
       TaskRoleArn: !Ref TaskRoleArn
       ContainerDefinitions:
         - Name: !Ref AppName
-          EntryPoint:
+          Command:
             - "--host"
             - "0.0.0.0"
             - "--port"
-            - !Ref GradioServerPort
-            - "--model-list-mode"
-            - "reload"
-            - "--ddb-table-name"
+            - !Ref AppPort
+            - "--workers"
+            - "3"
+            - "--table-name"
             - !Ref DDBTableName
-            - "--conv-templates"
-            - !Ref S3ConvTemplates
-            - "--conv-bucket"
-            - !Ref ConvBucket
-            - "--conv-prefix"
-            - !Ref ConvPrefix
-            - "--mode"
-            - !Ref WebUIMode
-            - "--worker-address"
-            - !Sub "http://${WorkerDNS}:${WorkerPort}"
+            - "--namespace"
+            - !Sub "${ProjectName}/${AppName}/"
           Environment:
             - Name: AWS_DEFAULT_REGION
               Value: !Ref AWS::Region
             - Name: AWS_REGION
               Value: !Ref AWS::Region
-          Image: !Ref WebUIImage
+            - Name: APP_LOG_LEVEL
+              Value: DEBUG
+          Image: !Join ['', [ !Ref AWS::AccountId, '.dkr.ecr.', !Ref AWS::Region, '.amazonaws.com/api_layer:latest']]
           PortMappings:
-            - ContainerPort: !Ref GradioServerPort
+            - ContainerPort: !Ref AppPort
           # Send logs to CloudWatch Logs
           LogConfiguration:
             LogDriver: awslogs
@@ -102,118 +90,15 @@ Resources:
               awslogs-region: !Ref AWS::Region
               awslogs-group: !Ref LogGroup
               awslogs-stream-prefix: ecs
-        - Name: fastchat-model-worker
-          EntryPoint:
-            - "python3.9"
-            - "/root/sagemaker-fastchat/serve/sagemaker_model_worker.py"
-            - "--host"
-            - "0.0.0.0"
-            - "--port"
-            - !Ref WorkerPort
-            - "--model-path"
-            - !Ref ModelPath
-            - "--ddb-table-name"
-            - !Ref DDBTableName
-          Environment:
-            - Name: AWS_DEFAULT_REGION
-              Value: !Ref AWS::Region
-            - Name: AWS_REGION
-              Value: !Ref AWS::Region
-          Image: !Ref WorkerImage
-          PortMappings:
-            - ContainerPort: !Ref WorkerPort
-          # Send logs to CloudWatch Logs
-          LogConfiguration:
-            LogDriver: awslogs
-            Options:
-              awslogs-region: !Ref AWS::Region
-              awslogs-group: !Ref LogGroup
-              awslogs-stream-prefix: ecs
-
-  # A role for the containers
-  TaskRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Join ['', [!Ref ProjectName, TaskRole]]
-      AssumeRolePolicyDocument:
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: ecs-tasks.amazonaws.com
-            Action: 'sts:AssumeRole'
-      Policies: 
-        - 
-          PolicyName: "SageMakerInvokePermissions"
-          PolicyDocument: 
-            Version: "2012-10-17"
-            Statement: 
-              - 
-                Effect: "Allow"
-                Action:
-                  - "sagemaker:InvokeEndpoint"
-                  - "s3:*"
-                  - "dynamodb:GetItem"
-                Resource: "*"
-  # A role needed for auto scaling
-  # AutoScalingRole:
-  #   Type: AWS::IAM::Role
-  #   Properties:
-  #     RoleName: !Join ['', [!Ref ServiceName, AutoScalingRole]]
-  #     AssumeRolePolicyDocument:
-  #       Statement:
-  #         - Effect: Allow
-  #           Principal:
-  #             Service: ecs-tasks.amazonaws.com
-  #           Action: 'sts:AssumeRole'
-  #     ManagedPolicyArns:
-  #       - 'arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceAutoscaleRole'
-  FastChatSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: !Join ['', [!Ref ProjectName, FastChatSecurityGroup]]
-      VpcId: !Ref VPC
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: !Ref GradioServerPort
-          ToPort: !Ref GradioServerPort
-          SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
-  FastChatSecurityGroupIngress:
-    Type: AWS::EC2::SecurityGroupIngress
-    DependsOn: 
-      - FastChatSecurityGroup
-    Properties:
-      GroupId: !Ref FastChatSecurityGroup
-      IpProtocol: tcp
-      FromPort: !Ref GradioServerPort
-      ToPort: !Ref GradioServerPort
-      SourceSecurityGroupId: !Ref FastChatSecurityGroup
-  LoadBalancerSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: !Join ['', [!Ref ProjectName, LoadBalancerSecurityGroup]]
-      VpcId: !Ref VPC
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          CidrIp: 0.0.0.0/0
   Service:
     Type: AWS::ECS::Service
     # This dependency is needed so that the load balancer is setup correctly in time
     DependsOn:
-      - ListenerHTTPS
       - ListenerHTTP
     Properties: 
-      ServiceName: "FastChatService"
-      Cluster: !Ref Cluster
-      TaskDefinition: !Ref GradioServer
-      # DeploymentConfiguration:
-      #   MinimumHealthyPercent: 100
-      #   MaximumPercent: 100
+      ServiceName: !Join ['', [!Ref AppName, 'Service']]
+      Cluster: !Ref ECSCluster
+      TaskDefinition: !Ref AppTaskDef
       DesiredCount: 1
       # This may need to be adjusted if the container takes a while to start up
       HealthCheckGracePeriodSeconds: 30
@@ -226,11 +111,12 @@ Resources:
             - !Ref PrivateSubnetA
             - !Ref PrivateSubnetB
           SecurityGroups:
-            - !Ref FastChatSecurityGroup
+            - !Ref APILayerSG
       LoadBalancers:
-        - ContainerName: fastchat-gradio-server
-          ContainerPort: !Ref GradioServerPort
+        - ContainerName: !Ref AppName
+          ContainerPort: !Ref AppPort
           TargetGroupArn: !Ref TargetGroup
+  
   TargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
@@ -240,40 +126,23 @@ Resources:
       HealthCheckTimeoutSeconds: 5
       UnhealthyThresholdCount: 2
       HealthyThresholdCount: 2
-      Name: !Join ['', [!Ref ProjectName, TargetGroup]]
-      Port: !Ref GradioServerPort
+      Name: !Join ['', [!Ref ProjectName, '-', !Ref AppName, -TargetGroup]]
+      Port: !Ref AppPort
       Protocol: HTTP
       TargetGroupAttributes:
         - Key: deregistration_delay.timeout_seconds
           Value: 60 # default is 300
       TargetType: ip
       VpcId: !Ref VPC
-  ListenerHTTPS:
+  ListenerHTTP:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
       DefaultActions:
         - TargetGroupArn: !Ref TargetGroup
           Type: forward
       LoadBalancerArn: !Ref LoadBalancer
-      Port: 443
-      Protocol: HTTPS
-      Certificates:
-        - CertificateArn: !Ref Certificate
-  ListenerHTTP:
-    Type: "AWS::ElasticLoadBalancingV2::Listener"
-    Properties:
-      DefaultActions:
-        - Type: "redirect"
-          RedirectConfig:
-            Protocol: "HTTPS"
-            Port: 443
-            Host: "#{host}"
-            Path: "/#{path}"
-            Query: "#{query}"
-            StatusCode: "HTTP_301"
-      LoadBalancerArn: !Ref LoadBalancer
-      Port: 80
-      Protocol: "HTTP"
+      Port: !Ref AppPort
+      Protocol: HTTP
   LoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
@@ -281,57 +150,17 @@ Resources:
         # this is the default, but is specified here in case it needs to be changed
         - Key: idle_timeout.timeout_seconds
           Value: 60
-      Name: !Join ['', [!Ref ProjectName, LoadBalancer]]
-      # "internal" is also an option
-      Scheme: internet-facing
+      Name: !Join ['', [!Ref ProjectName, '-', !Ref AppName, '-LoadBalancer']]
+      Scheme: internal
       SecurityGroups:
         - !Ref LoadBalancerSecurityGroup
       Subnets:
-        - !Ref PublicSubnetA
-        - !Ref PublicSubnetB
-  # DNSRecord:
-  #   Type: AWS::Route53::RecordSet
-  #   Properties:
-  #     HostedZoneName: !Join ['', [!Ref HostedZoneName, .]]
-  #     Name: !Join ['', [!Ref Subdomain, ., !Ref HostedZoneName, .]]
-  #     Type: A
-  #     AliasTarget:
-  #       DNSName: !GetAtt LoadBalancer.DNSName
-  #       HostedZoneId: !GetAtt LoadBalancer.CanonicalHostedZoneID
-
+        - !Ref PrivateSubnetA
+        - !Ref PrivateSubnetB
   LogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Join ['', [/ecs/, !Ref ProjectName,/, FastChatDefinition]]
-  # AutoScalingTarget:
-  #   Type: AWS::ApplicationAutoScaling::ScalableTarget
-  #   Properties:
-  #     MinCapacity: !Ref MinContainers
-  #     MaxCapacity: !Ref MaxContainers
-  #     ResourceId: !Join ['/', [service, !Ref Cluster, !GetAtt Service.Name]]
-  #     ScalableDimension: ecs:service:DesiredCount
-  #     ServiceNamespace: ecs
-  #     # "The Amazon Resource Name (ARN) of an AWS Identity and Access Management (IAM) role that allows Application Auto Scaling to modify your scalable target."
-  #     RoleARN: !GetAtt AutoScalingRole.Arn
-  # AutoScalingPolicy:
-  #   Type: AWS::ApplicationAutoScaling::ScalingPolicy
-  #   Properties:
-  #     PolicyName: !Join ['', [!Ref ServiceName, AutoScalingPolicy]]
-  #     PolicyType: TargetTrackingScaling
-  #     ScalingTargetId: !Ref AutoScalingTarget
-  #     TargetTrackingScalingPolicyConfiguration:
-  #       PredefinedMetricSpecification:
-  #         PredefinedMetricType: ECSServiceAverageCPUUtilization
-  #       ScaleInCooldown: 10
-  #       ScaleOutCooldown: 10
-  #       # Keep things at or lower than 50% CPU utilization, for example
-  #       TargetValue: !Ref AutoScalingTargetValue
+      LogGroupName: !Join ['', [/ecs/, !Ref ProjectName,/, !Ref AppName]]
 Outputs:
-  FastChatSecurityGroup:
-    Value: !Ref FastChatSecurityGroup
-  ExecutionRole: 
-    Value: !Ref ExecutionRole
   ALBDNSName: 
     Value: !GetAtt LoadBalancer.DNSName
-  TaskRole:
-    Value: !Ref TaskRole

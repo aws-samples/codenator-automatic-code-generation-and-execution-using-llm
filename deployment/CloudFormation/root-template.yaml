@@ -30,6 +30,9 @@ Parameters:
   ProjectBucket:
     Type: String
     Default: codenator-dev-00
+  AppPort:
+    Type: String
+    Default: 8080
   ProjectPrefix:
     Type: String
     Default: codenator/CFN/
@@ -47,7 +50,7 @@ Resources:
   VPCStack:
     Type: 'AWS::CloudFormation::Stack'
     Properties:
-      TemplateURL: !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectPrefix, '/vpc-template.yaml']]
+      TemplateURL: !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectPrefix, 'vpc-template.yaml']]
       Parameters:
         ProjectName: !Ref ProjectName
         VpcCIDR: !Ref VpcCIDR
@@ -55,23 +58,24 @@ Resources:
         PrivateSubnetCIDRA: !Ref PrivateSubnetCIDRA
         PublicSubnetCIDRB: !Ref PublicSubnetCIDRB
         PrivateSubnetCIDRB: !Ref PrivateSubnetCIDRB
+        AppPort: !Ref AppPort
   IAMStack:
     Type: 'AWS::CloudFormation::Stack'
     Properties:
-      TemplateURL: !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectPrefix, '/iam-template.yaml']]
+      TemplateURL: !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectPrefix, 'iam-template.yaml']]
       Parameters:
         ProjectName: !Ref ProjectName
   PromptStoreStack:
     Type: 'AWS::CloudFormation::Stack'
     Properties:
-      TemplateURL:  !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectPrefix, '/prompt-store.yaml']]
+      TemplateURL:  !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectPrefix, 'prompt-store.yaml']]
       Parameters:
         DataBucket: !Ref ProjectBucket
         TableName: !Ref PromptStoreTableName
   ModelDBStack:
     Type: 'AWS::CloudFormation::Stack'
     Properties:
-      TemplateURL:  !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectPrefix, '/model-db.yaml']]
+      TemplateURL:  !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectPrefix, 'model-db.yaml']]
       Parameters:
         DataBucket: !Ref ProjectBucket
         TableName: !Ref APILayerTableName
@@ -79,5 +83,21 @@ Resources:
     Type: AWS::ECS::Cluster
     Properties:
       ClusterName: !Join ['', [!Ref ProjectName, Cluster]]
-  # A role needed by ECS
+  APILayerService:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectPrefix, 'api-layer.yaml']]
+      Parameters:
+        ProjectName: !Ref ProjectName
+        VPC: !GetAtt VPCStack.Outputs.VpcID
+        PrivateSubnetA: !GetAtt VPCStack.Outputs.PrivateSubnetA
+        PrivateSubnetB: !GetAtt VPCStack.Outputs.PrivateSubnetB
+        AppName: api-layer
+        AppPort: !Ref AppPort
+        DDBTableName: !Ref APILayerTableName
+        ECSCluster: !Ref Cluster
+        ExecutionRoleArn: !GetAtt IAMStack.Outputs.ECSExecutionRole
+        TaskRoleArn: !GetAtt IAMStack.Outputs.APILayerTaskRole
+        APILayerSG: !GetAtt VPCStack.Outputs.AppSecurityGroup
+        LoadBalancerSecurityGroup: !GetAtt VPCStack.Outputs.LoadBalancerSecurityGroup
   
