@@ -12,6 +12,8 @@ Parameters:
     MinLength: '1'
     Type: String
     Default: codenator
+  KMSKeyArn:
+    Type: String
 Resources:
   ECSExecutionRole:
     Type: AWS::IAM::Role
@@ -28,7 +30,7 @@ Resources:
   APILayerTaskRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Join ['', [!Ref ProjectName, TaskRole]]
+      RoleName: !Join ['', [!Ref ProjectName, APILayerTaskRole]]
       AssumeRolePolicyDocument:
         Statement:
           - Effect: Allow
@@ -37,7 +39,7 @@ Resources:
             Action: 'sts:AssumeRole'
       Policies: 
         - 
-          PolicyName: "SageMakerInvokePermissions"
+          PolicyName: "APILayerPermissions"
           PolicyDocument: 
             Version: "2012-10-17"
             Statement: 
@@ -49,9 +51,64 @@ Resources:
                   - "logs:PutMetricData"
                   - "dynamodb:GetItem"
                 Resource: "*"
+  CodeExecTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['', [!Ref ProjectName, CodeExecTaskRole]]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies: 
+        - 
+          PolicyName: "CodeExecPermissions"
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - 
+                Effect: "Allow"
+                Action:
+                  - "logs:PutMetricData"
+                Resource: "*"
+              - 
+                Effect: "Allow"
+                Action:
+                  - "kms:Decrypt"
+                Resource: !Ref KMSKeyArn
+  CodeScanTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['', [!Ref ProjectName, CodeScanTaskRole]]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies: 
+        - 
+          PolicyName: "CodeScanPermissions"
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - 
+                Effect: "Allow"
+                Action:
+                  - "codeguru-security:CreateScan"
+                  - "codeguru-security:CreateUploadUrl"
+                  - "codeguru-security:GetScan"
+                  - "codeguru-security:GetFindings"
+                  - "logs:PutMetricData"
+                Resource: "*"
 
 Outputs:
   ECSExecutionRole:
     Value: !GetAtt ECSExecutionRole.Arn
-  APILayerTaskRole:
+  APITaskRole:
     Value: !GetAtt APILayerTaskRole.Arn
+  CodeExecTaskRole:
+    Value: !GetAtt CodeExecTaskRole.Arn
+  CodeScanTaskRole:
+    Value: !GetAtt CodeScanTaskRole.Arn

@@ -65,6 +65,7 @@ Resources:
       TemplateURL: !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectPrefix, 'iam-template.yaml']]
       Parameters:
         ProjectName: !Ref ProjectName
+        KMSKeyArn: !GetAtt KMSKey.Arn
   PromptStoreStack:
     Type: 'AWS::CloudFormation::Stack'
     Properties:
@@ -83,6 +84,27 @@ Resources:
     Type: AWS::ECS::Cluster
     Properties:
       ClusterName: !Join ['', [!Ref ProjectName, Cluster]]
+  KMSKey:
+    Type: 'AWS::KMS::Key'
+    Properties:
+      Description: symmetric encryption KMS key for code executor
+      EnableKeyRotation: false
+      PendingWindowInDays: 7
+      KeyPolicy:
+        Version: 2012-10-17
+        Id: key-default-1
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: !Join ['',['arn:aws:iam::', !Ref AWS:AccountId, ':root']]
+            Action: 'kms:*'
+            Resource: '*'
+  KMSAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Join ['', [alias/, !Ref ProjectName, -kms]]
+      TargetKeyId: !Ref KMSKey
   APILayerService:
     Type: 'AWS::CloudFormation::Stack'
     Properties:
@@ -100,4 +122,44 @@ Resources:
         TaskRoleArn: !GetAtt IAMStack.Outputs.APILayerTaskRole
         APILayerSG: !GetAtt VPCStack.Outputs.AppSecurityGroup
         LoadBalancerSecurityGroup: !GetAtt VPCStack.Outputs.LoadBalancerSecurityGroup
+  CodeExecService:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectPrefix, 'code-executor.yaml']]
+      Parameters:
+        ProjectName: !Ref ProjectName
+        VPC: !GetAtt VPCStack.Outputs.VpcID
+        PrivateSubnetA: !GetAtt VPCStack.Outputs.PrivateSubnetA
+        PrivateSubnetB: !GetAtt VPCStack.Outputs.PrivateSubnetB
+        AppName: code-executor
+        AppPort: !Ref AppPort
+        KMSKey: !Ref KMSAlias
+        ECSCluster: !Ref Cluster
+        ExecutionRoleArn: !GetAtt IAMStack.Outputs.ECSExecutionRole
+        TaskRoleArn: !GetAtt IAMStack.Outputs.CodeExecTaskRole
+        AppSG: !GetAtt VPCStack.Outputs.AppSecurityGroup
+        LoadBalancerSecurityGroup: !GetAtt VPCStack.Outputs.LoadBalancerSecurityGroup
+  CodeScanService:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectPrefix, 'code-scanner.yaml']]
+      Parameters:
+        ProjectName: !Ref ProjectName
+        VPC: !GetAtt VPCStack.Outputs.VpcID
+        PrivateSubnetA: !GetAtt VPCStack.Outputs.PrivateSubnetA
+        PrivateSubnetB: !GetAtt VPCStack.Outputs.PrivateSubnetB
+        AppName: code-scanner
+        AppPort: !Ref AppPort
+        ECSCluster: !Ref Cluster
+        ExecutionRoleArn: !GetAtt IAMStack.Outputs.ECSExecutionRole
+        TaskRoleArn: !GetAtt IAMStack.Outputs.CodeScanTaskRole
+        AppSG: !GetAtt VPCStack.Outputs.AppSecurityGroup
+        LoadBalancerSecurityGroup: !GetAtt VPCStack.Outputs.LoadBalancerSecurityGroup
+Outputs:
+  APILayerDNSName:
+    Value: APILayerService.Outputs.ALBDNSName
+  CodeExecDNSName:
+    Value: CodeExecService.Outputs.ALBDNSName
+  CodeScanDNSName:
+    Value: CodeScanService.Outputs.ALBDNSName
   
