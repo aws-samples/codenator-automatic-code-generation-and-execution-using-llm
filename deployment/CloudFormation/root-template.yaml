@@ -158,9 +158,9 @@ Resources:
         LoadBalancerSecurityGroup: !GetAtt VPCStack.Outputs.LoadBalancerSecurityGroup
 Outputs:
   APILayerDNSName:
-    Value: APILayerService.Outputs.ALBDNSName
+    Value: !GetAtt APILayerService.Outputs.ALBDNSName
   CodeExecDNSName:
-    Value: CodeExecService.Outputs.ALBDNSName
+    Value: !GetAtt CodeExecService.Outputs.ALBDNSName
   CodeScanDNSName:
-    Value: CodeScanService.Outputs.ALBDNSName
+    Value: !GetAtt CodeScanService.Outputs.ALBDNSName
   
