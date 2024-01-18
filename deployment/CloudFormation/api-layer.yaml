@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: Deploying fastchat on Fargate.
+Description: Deploying apps on Fargate.
 Parameters:
   VPC:
     Type: String
@@ -15,68 +15,35 @@ Parameters:
     Type: String
     # Update with the certificate ARN from Certificate Manager, which must exist in the same region.
     Default: 'arn:aws:acm:region:123456789012:certificate/00000000-0000-0000-0000-000000000000'
-  WebUIImage:
-    Type: String
-  WorkerImage:
-    Type: String
   ProjectName:
     Type: String
-  S3ConvTemplates:
+  AppName:
     Type: String
-  ConvBucket:
+    Default: api-layer
+  AppImage:
     Type: String
-  ConvPrefix:
-    Type: String
-  WebUIMode:
-    Type: String
-    Default: "single"
-  GradioServerPort:
+  AppPort:
     Type: Number
-    Default: 8001
-  ModelPath:
-    Type: String
-    Default: tiiuae/falcon-7b-instruct
-  WorkerDns:
-    Type: String
-    Default: "127.0.0.1"
-  WorkerPort:
-    Type: Number
-    Default: 21002
+    Default: 8080
   DDBTableName:
     Type: String
   HealthCheckPath:
     Type: String
-    Default: /
-  # HostedZoneName:
-  #   Type: String
-  #   Default: company.com
-  # Subdomain:
-  #   Type: String
-  #   Default: myservice
-  # for autoscaling
-  # MinContainers:
-  #   Type: Number
-  #   Default: 1
-  # # for autoscaling
-  # MaxContainers:
-  #   Type: Number
-  #   Default: 1
-  # target CPU utilization (%)
-  # AutoScalingTargetValue:
-  #   Type: Number
-  #   Default: 50
+    Default: /ping
+  ECSCluster:
+    Type: String
+  ExecutionRoleArn:
+    Type: String
+  TaskRoleArn:
+    Type: String
 Resources:
-  Cluster:
-    Type: AWS::ECS::Cluster
-    Properties:
-      ClusterName: !Join ['', [!Ref ProjectName, FastChatCluster]]
-  GradioServer:
+  AppTaskDef:
     Type: AWS::ECS::TaskDefinition
     # Makes sure the log group is created before it is used.
     DependsOn: LogGroup
     Properties:
       # Name of the task definition. Subsequent versions of the task definition are grouped together under this name.
-      Family: !Join ['', [!Ref ProjectName, GradioServerDefinition]]
+      Family: !Join ['', [!Ref ProjectName, '_', !Ref AppName, '_TaskDef']]
       # awsvpc is required for Fargate
       NetworkMode: awsvpc
       RequiresCompatibilities:
@@ -96,14 +63,12 @@ Resources:
       # A role needed by ECS.
       # "The ARN of the task execution role that containers in this task can assume. All containers in this task are granted the permissions that are specified in this role."
       # "There is an optional task execution IAM role that you can specify with Fargate to allow your Fargate tasks to make API calls to Amazon ECR."
-      ExecutionRoleArn: !Ref ExecutionRole
+      ExecutionRoleArn: !Ref ExecutionRoleArn
       # "The Amazon Resource Name (ARN) of an AWS Identity and Access Management (IAM) role that grants containers in the task permission to call AWS APIs on your behalf."
-      TaskRoleArn: !Ref TaskRole
+      TaskRoleArn: !Ref TaskRoleArn
       ContainerDefinitions:
-        - Name: fastchat-gradio-server
+        - Name: !Ref AppName
           EntryPoint:
-            - "python3.9"
-            - "/root/sagemaker-fastchat/serve/sagemaker_gradio_web_server.py"
             - "--host"
             - "0.0.0.0"
             - "--port"
@@ -164,19 +129,7 @@ Resources:
               awslogs-region: !Ref AWS::Region
               awslogs-group: !Ref LogGroup
               awslogs-stream-prefix: ecs
-  # A role needed by ECS
-  ExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Join ['', [!Ref ProjectName, ExecutionRole]]
-      AssumeRolePolicyDocument:
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: ecs-tasks.amazonaws.com
-            Action: 'sts:AssumeRole'
-      ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+
   # A role for the containers
   TaskRole:
     Type: AWS::IAM::Role

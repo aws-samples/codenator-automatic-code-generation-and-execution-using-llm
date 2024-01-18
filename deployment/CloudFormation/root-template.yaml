@@ -30,6 +30,9 @@ Parameters:
   ProjectBucket:
     Type: String
     Default: codenator-dev-00
+  ProjectPrefix:
+    Type: String
+    Default: codenator/CFN/
   PromptStoreTableName:
     Type: String
     Default: "prompt-store"
@@ -40,17 +43,11 @@ Parameters:
     Type: String
     # Update with the certificate ARN from Certificate Manager, which must exist in the same region.
     Default: 'arn:aws:acm:region:123456789012:certificate/00000000-0000-0000-0000-000000000000'
-  VPCTemplate:
-    Type: String
-    Default: https://codenator-dev-00.s3.us-west-2.amazonaws.com/codenator/CFN/vpc-template.yaml
-  PSTemplate:
-    Type: String
-    Default: https://codenator-dev-00.s3.us-west-2.amazonaws.com/codenator/CFN/prompt-store.yaml
 Resources:
   VPCStack:
     Type: 'AWS::CloudFormation::Stack'
     Properties:
-      TemplateURL: !Ref VPCTemplate
+      TemplateURL: !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectPrefix, '/vpc-template.yaml']]
       Parameters:
         ProjectName: !Ref ProjectName
         VpcCIDR: !Ref VpcCIDR
@@ -58,10 +55,29 @@ Resources:
         PrivateSubnetCIDRA: !Ref PrivateSubnetCIDRA
         PublicSubnetCIDRB: !Ref PublicSubnetCIDRB
         PrivateSubnetCIDRB: !Ref PrivateSubnetCIDRB
+  IAMStack:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectPrefix, '/iam-template.yaml']]
+      Parameters:
+        ProjectName: !Ref ProjectName
   PromptStoreStack:
     Type: 'AWS::CloudFormation::Stack'
     Properties:
-      TemplateURL: !Ref PSTemplate
+      TemplateURL:  !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectPrefix, '/prompt-store.yaml']]
       Parameters:
         DataBucket: !Ref ProjectBucket
         TableName: !Ref PromptStoreTableName
+  ModelDBStack:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL:  !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectPrefix, '/model-db.yaml']]
+      Parameters:
+        DataBucket: !Ref ProjectBucket
+        TableName: !Ref APILayerTableName
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Join ['', [!Ref ProjectName, Cluster]]
+  # A role needed by ECS
+  

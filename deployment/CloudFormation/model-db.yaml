@@ -1,0 +1,42 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Parameters:
+  TableName:
+    Type: String
+    Default: "model_db"
+  DataBucket:
+    Type: String
+    Default: "codenator-dev-00"
+  DataPrefix:
+    Type: String
+    Default: "codenator/CFN/data/model_db.csv"
+Resources:
+  DDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref TableName
+      BillingMode: PROVISIONED
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      AttributeDefinitions:
+        -
+          AttributeName: "pk"
+          AttributeType: "S"
+        -
+          AttributeName: "sk"
+          AttributeType: "S"
+      KeySchema:
+        -
+          AttributeName: "pk"
+          KeyType: "HASH"
+        -
+          AttributeName: "sk"
+          KeyType: "RANGE"
+      SSESpecification:
+        SSEEnabled: False
+      ImportSourceSpecification:
+        InputCompressionType: "NONE"
+        InputFormat: "CSV"
+        S3BucketSource:
+          S3Bucket: !Ref DataBucket
+          S3KeyPrefix: !Ref DataPrefix

@@ -1,0 +1,31 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  This template creates the IAM roles required to deploy Gen AI chat agent
+Parameters:
+  ProjectName:
+    AllowedPattern: '[A-Za-z0-9-]{1,16}'
+    ConstraintDescription: >-
+      Maximum of 22 alphanumeric characters. Can include hyphens (-), but not
+      spaces. Must be unique within your account in an AWS Region.
+    Description: Project Name used to identify your resources
+    MaxLength: '16'
+    MinLength: '1'
+    Type: String
+    Default: codenator
+Resources:
+  ECSExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['', [!Ref ProjectName, ECSExecutionRole]]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+
+Outputs:
+  ECSExecutionRole:
+    Value: !GetAtt ECSExecutionRole.Arn

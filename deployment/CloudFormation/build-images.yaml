@@ -114,5 +114,15 @@ Resources:
         SourceRepo: !Ref SourceRepo
         CodeBuildPushDockerRole: !GetAtt CodeBuildPushDockerRole.Arn
 Outputs:
-  CodeBuildRole:
-    Value: !Ref CodeBuildPushDockerRole
+  APILayerImageUri:
+    Value: !GetAtt APILayerImage.Outputs.ImageUri
+  CodeExecImageUri:
+    Value: !GetAtt CodeExecImage.Outputs.ImageUri
+  CodeScanImageUri:
+    Value: !GetAtt CodeScanImage.Outputs.ImageUri
+  ControllerImageUri:
+    Value: !GetAtt ControllerImage.Outputs.ImageUri
+  TaskStoreImageUri:
+    Value: !GetAtt TaskStoreImage.Outputs.ImageUri
+  WebUIImageUri:
+    Value: !GetAtt WebUiImage.Outputs.ImageUri
