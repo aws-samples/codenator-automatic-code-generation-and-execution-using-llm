@@ -22,10 +22,38 @@ class AOSSStore(BaseStore):
             connection_class=RequestsHttpConnection,
         )
         self.scorer = scoring[similarity]
-    
+        try:
+            response = self.client.get(index="_all")
+            if self.index not in response:
+                index_body = {
+                    "settings": {
+                        "index": {
+                            "knn": True,
+                            "knn.algo_param.ef_search": 512
+                        }
+                    },
+                    "mappings": {
+                        "properties": {
+                            "embedding": {
+                                "type": "knn_vector",
+                                "dimension": 1536,
+                                "method": {
+                                    "name": "hnsw",
+                                    "engine": "nmslib",
+                                    "parameters": {},
+                                    "space_type": "cosinesimil"
+                                }
+                            }
+                        }
+                    }
+                }
+                response = self.client.indices.create(self.index, body=index_body)
+        except Exception as e:
+            raise e
+
     def get_config(self):
         return {
-            "index": os.getenv("AOSS_INDEX", ""),
+            "index": os.getenv("AOSS_INDEX", "task-store-index"),
             "region": os.getenv("AWS_REGION", "us-east-1"),
             "endpoint": os.getenv("AOSS_ENDPOINT", "")
         }

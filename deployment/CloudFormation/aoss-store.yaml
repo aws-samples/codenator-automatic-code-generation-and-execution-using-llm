@@ -24,8 +24,9 @@ Resources:
     VpcId: !Ref VPC
     SubnetIds:
      - !Ref PrivateSubnetA
+     - !Ref PrivateSubnetA
     SecurityGroupIds:
-     - !Ref PrivateSubnetB
+     - !Ref StoreSG
   DataAccessPolicy:
     Type: 'AWS::OpenSearchServerless::AccessPolicy'
     Properties:
@@ -43,7 +44,7 @@ Resources:
       Type: network
       Description: Network policy for task-store collection
       Policy: !Sub >-
-        [{"Rules":[{"ResourceType":"collection","Resource":["collection/task-store"]}, {"ResourceType":"dashboard","Resource":["collection/task-store"]}],"AllowFromPublic":false,"SourceVPCEs":[${VpcEndpoint}]}]
+        [{"Rules":[{"ResourceType":"collection","Resource":["collection/task-store"]}, {"ResourceType":"dashboard","Resource":["collection/task-store"]}],"AllowFromPublic":false,"SourceVPCEs":["${VpcEndpoint}"]}]
   EncryptionPolicy:
     Type: 'AWS::OpenSearchServerless::SecurityPolicy'
     Properties:

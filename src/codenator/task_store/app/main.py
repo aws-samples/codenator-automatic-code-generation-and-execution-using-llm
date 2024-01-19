@@ -104,7 +104,7 @@ if __name__ == "__main__":
     parser.add_argument("--workers", type=int, default=3)
     parser.add_argument("--namespace", type=str, default="Codenator/task-store/")
     parser.add_argument("--aoss-endpoint", type=str, default="")
-    parser.add_argument("--aoss-index", type=str, default="")
+    parser.add_argument("--aoss-index", type=str, default="task-store-index")
     args = parser.parse_args()
     os.environ["CW_NAMESPACE"] = args.namespace
     os.environ["AOSS_ENDPOINT"] = args.aoss_endpoint
