@@ -35,7 +35,7 @@ Parameters:
     Default: 443
   ProjectBucket:
     Type: String
-    Default: codenator-dev-00
+    Default: my-codenator-bucket
   ProjectCFNPrefix:
     Type: String
     Default: codenator/CFN/
