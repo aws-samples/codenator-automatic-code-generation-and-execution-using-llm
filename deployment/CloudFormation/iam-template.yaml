@@ -50,7 +50,7 @@ Resources:
                 Action:
                   - "sagemaker:InvokeEndpoint*"
                   - "bedrock:InvokeModel*"
-                  - "logs:PutMetricData"
+                  - "cloudwatch:PutMetricData"
                 Resource: "*"
               - 
                 Effect: "Allow"
@@ -77,7 +77,7 @@ Resources:
               - 
                 Effect: "Allow"
                 Action:
-                  - "logs:PutMetricData"
+                  - "cloudwatch:PutMetricData"
                 Resource: "*"
               - 
                 Effect: "Allow"
@@ -107,9 +107,30 @@ Resources:
                   - "codeguru-security:CreateUploadUrl"
                   - "codeguru-security:GetScan"
                   - "codeguru-security:GetFindings"
-                  - "logs:PutMetricData"
+                  - "cloudwatch:PutMetricData"
                 Resource: "*"
-
+  TaskStoreTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['', [!Ref ProjectName, TaskStoreTaskRole]]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies: 
+        - 
+          PolicyName: "TaskStorePermissions"
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - 
+                Effect: "Allow"
+                Action:
+                  - "aoss:*"
+                  - "cloudwatch:PutMetricData"
+                Resource: "*"
 Outputs:
   ECSExecutionRole:
     Value: !GetAtt ECSExecutionRole.Arn
@@ -119,3 +140,5 @@ Outputs:
     Value: !GetAtt CodeExecTaskRole.Arn
   CodeScanTaskRole:
     Value: !GetAtt CodeScanTaskRole.Arn
+  TaskStoreTaskRole:
+    Value: !GetAtt TaskStoreTaskRole.Arn

@@ -1,0 +1,64 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'Amazon OpenSearch Serverless template to create Task Store'
+Parameters:
+  VPC:
+    Type: String
+  PrivateSubnetA:
+    Type: String
+  PrivateSubnetB:
+    Type: String
+  ProjectName:
+    Type: String
+  AppName:
+    Type: String
+    Default: task-store
+  TaskRoleArn:
+    Type: String
+  StoreSG:
+    Type: String
+Resources:
+  VpcEndpoint:
+   Type: 'AWS::OpenSearchServerless::VpcEndpoint'
+   Properties:
+    Name: aoss-vpcendpoint
+    VpcId: !Ref VPC
+    SubnetIds:
+     - !Ref PrivateSubnetA
+    SecurityGroupIds:
+     - !Ref PrivateSubnetB
+  DataAccessPolicy:
+    Type: 'AWS::OpenSearchServerless::AccessPolicy'
+    Properties:
+      Name: task-store-access-policy
+      Type: data
+      Description: Access policy for task-store collection
+      Policy: !Sub >-
+        [{"Description":"Access for cfn user","Rules":[{"ResourceType":"index","Resource":["index/*/*"],"Permission":["aoss:*"]},
+        {"ResourceType":"collection","Resource":["collection/task-store"],"Permission":["aoss:*"]}],
+        "Principal":["${TaskRoleArn}"]}]
+  NetworkPolicy:
+    Type: 'AWS::OpenSearchServerless::SecurityPolicy'
+    Properties:
+      Name: quickstart-network-policy
+      Type: network
+      Description: Network policy for task-store collection
+      Policy: !Sub >-
+        [{"Rules":[{"ResourceType":"collection","Resource":["collection/task-store"]}, {"ResourceType":"dashboard","Resource":["collection/task-store"]}],"AllowFromPublic":false,"SourceVPCEs":[${VpcEndpoint}]}]
+  EncryptionPolicy:
+    Type: 'AWS::OpenSearchServerless::SecurityPolicy'
+    Properties:
+      Name: task-store-security-policy
+      Type: encryption
+      Description: Encryption policy for task-store collection
+      Policy: >-
+        {"Rules":[{"ResourceType":"collection","Resource":["collection/task-store"]}],"AWSOwnedKey":true}
+  Collection:
+    Type: 'AWS::OpenSearchServerless::Collection'
+    Properties:
+      Name: task-store
+      Type: VECTORSEARCH
+      Description: Codenator Task store
+    DependsOn: EncryptionPolicy
+Outputs:
+  CollectionARN:
+    Value: !GetAtt Collection.Arn

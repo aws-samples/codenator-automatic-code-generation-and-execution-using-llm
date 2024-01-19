@@ -325,8 +325,8 @@ def execute_fn(
             max_lines=output_lines
         )
     images = []
-    if "files" in json_obj:
-        for file in json_obj["files"]:
+    if "files" in response:
+        for file in response["files"]:
             file_name, content = file.values()
             image_content = base64.b64decode(content)
             with open(os.path.join(files_path, file_name), "wb") as img:
@@ -983,4 +983,4 @@ def get_languages_list(url):
 if __name__ == "__main__":
     languages = get_languages_list(controller_url)
     UI = web_ui()
-    UI.queue(status_update_rate=10, api_open=False).launch(debug=False, max_threads=output_lines0)
+    UI.queue(status_update_rate=10, api_open=False).launch(debug=False, max_threads=output_lines)
