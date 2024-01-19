@@ -30,7 +30,7 @@ Resources:
   DataAccessPolicy:
     Type: 'AWS::OpenSearchServerless::AccessPolicy'
     Properties:
-      Name: !Join ['', [!Ref ProjectName, -task-store-access-policy]]
+      Name: !Join ['', [!Ref ProjectName, -ts-access-policy]]
       Type: data
       Description: Access policy for task-store collection
       Policy: !Sub >-
@@ -40,7 +40,7 @@ Resources:
   NetworkPolicy:
     Type: 'AWS::OpenSearchServerless::SecurityPolicy'
     Properties:
-      Name: !Join ['', [!Ref ProjectName, -task-store-network-policy]]
+      Name: !Join ['', [!Ref ProjectName, -ts-network-policy]]
       Type: network
       Description: Network policy for task-store collection
       Policy: !Sub >-
@@ -48,7 +48,7 @@ Resources:
   EncryptionPolicy:
     Type: 'AWS::OpenSearchServerless::SecurityPolicy'
     Properties:
-      Name: !Join ['', [!Ref ProjectName, -task-store-security-policy]]
+      Name: !Join ['', [!Ref ProjectName, -ts-security-policy]]
       Type: encryption
       Description: Encryption policy for task-store collection
       Policy: >-
