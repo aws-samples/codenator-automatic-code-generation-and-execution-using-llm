@@ -61,5 +61,5 @@ Resources:
       Description: Codenator Task store
     DependsOn: EncryptionPolicy
 Outputs:
-  CollectionARN:
+  StoreEndpoint:
     Value: !GetAtt Collection.CollectionEndpoint

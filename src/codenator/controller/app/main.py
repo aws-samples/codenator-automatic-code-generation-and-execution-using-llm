@@ -9,16 +9,11 @@ from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
 import uvicorn
 from conversation import Conversation
-import boto3
 from typing import Dict, Any
 from utils import (
     get_model_type,
     get_model_metadata,
     get_languages,
-    send_req_to_agent,
-    security_scan_script,
-    send_script_to_exc,
-    extract_script,
     EncryptorClass,
     get_prompt_store,
     publish_metrics
