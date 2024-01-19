@@ -250,7 +250,7 @@ Resources:
         ProjectFeedbackPrefix: !Ref ProjectFeedbackPrefix
         ALBPort: !Ref ALBPort
         ControllerDNS: !GetAtt ControllerService.Outputs.ALBDNSName
-        ControllerPort: !GetAtt InternalAppPort
+        ControllerPort: !Ref InternalAppPort
         Certificate: !Ref Certificate
 Outputs:
   APILayerDNSName:
