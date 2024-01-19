@@ -30,6 +30,9 @@ Parameters:
   AppPort:
     Type: String
     Default: 8080
+  ALBPort:
+    Type: String
+    Default: 443
 Resources:
   VPC:
     Type: 'AWS::EC2::VPC'
@@ -170,6 +173,20 @@ Resources:
         - IpProtocol: tcp
           FromPort: !Ref AppPort
           ToPort: !Ref AppPort
+          CidrIp: !Ref VpcCIDR
+  WebUILoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Join ['', [!Ref ProjectName, LoadBalancerSecurityGroup]]
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref ALBPort
+          ToPort: !Ref ALBPort
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
           CidrIp: 0.0.0.0/0
   VPCESecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -197,5 +214,7 @@ Outputs:
     Value: !Ref AppSG
   LoadBalancerSecurityGroup:
     Value: !Ref LoadBalancerSecurityGroup
+  WebUILoadBalancerSecurityGroup:
+    Value: !Ref WebUILoadBalancerSecurityGroup
   VPCESecurityGroup:
     Value: !Ref VPCESecurityGroup

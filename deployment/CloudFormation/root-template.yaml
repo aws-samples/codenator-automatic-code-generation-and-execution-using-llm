@@ -15,6 +15,7 @@ Parameters:
   VpcCIDR:
     Type: String
     Default: 10.2.0.0/16
+    Description: Project VPC CIDR Range
   PublicSubnetCIDRA:
     Type: String
     Default: 10.2.0.0/24
@@ -30,31 +31,40 @@ Parameters:
   InternalAppPort:
     Type: Number
     Default: 8080
+    Description: Internal application communication port
   ALBPort:
     Type: Number
     Default: 443
+    Description: Application internet facing communication port
   ProjectBucket:
     Type: String
     Default: my-codenator-bucket
+    Description: Project bucket
   ProjectCFNPrefix:
     Type: String
     Default: codenator/CFN/
+    Description: Prefix to the project's CloudFormation templates
   ProjectConvPrefix:
     Type: String
     Default: codenator/conv/
+    Description: Prefix to the project's coversation logs
   ProjectFeedbackPrefix:
     Type: String
     Default: codenator/feedback/
+    Description: Prefix to the project's feedback logs
   PromptStoreTableName:
     Type: String
     Default: "prompt-store"
+    Description: Prompt Store DynamoDB table name
   ModelDBTableName:
     Type: String
     Default: "model-db"
+    Description: Model metadata database DynamoDB table name
   Certificate:
     Type: String
     # Update with the certificate ARN from Certificate Manager, which must exist in the same region.
     Default: 'arn:aws:acm:region:123456789012:certificate/00000000-0000-0000-0000-000000000000'
+    Description: SSL/TLS certificates ARN from Certificate Manager, which must exist in the same region.
 Resources:
   VPCStack:
     Type: 'AWS::CloudFormation::Stack'
@@ -68,6 +78,7 @@ Resources:
         PublicSubnetCIDRB: !Ref PublicSubnetCIDRB
         PrivateSubnetCIDRB: !Ref PrivateSubnetCIDRB
         AppPort: !Ref InternalAppPort
+        ALBPort: !Ref ALBPort
   IAMStack:
     Type: 'AWS::CloudFormation::Stack'
     Properties:
@@ -244,7 +255,7 @@ Resources:
         ExecutionRoleArn: !GetAtt IAMStack.Outputs.ECSExecutionRole
         TaskRoleArn: !GetAtt IAMStack.Outputs.WebUITaskRole
         AppSG: !GetAtt VPCStack.Outputs.AppSecurityGroup
-        LoadBalancerSecurityGroup: !GetAtt VPCStack.Outputs.LoadBalancerSecurityGroup
+        LoadBalancerSecurityGroup: !GetAtt VPCStack.Outputs.WebUILoadBalancerSecurityGroup
         ModelDBTableName: !Ref ModelDBTableName
         # ProjectBucket: !Ref ProjectBucket
         # ProjectFeedbackPrefix: !Ref ProjectFeedbackPrefix

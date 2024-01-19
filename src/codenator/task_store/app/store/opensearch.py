@@ -23,7 +23,7 @@ class AOSSStore(BaseStore):
         )
         self.scorer = scoring[similarity]
         try:
-            response = self.client.get(index="_all")
+            response = self.client.indices.get(index="_all")
             if self.index not in response:
                 index_body = {
                     "settings": {
