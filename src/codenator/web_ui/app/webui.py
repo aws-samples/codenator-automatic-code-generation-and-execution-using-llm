@@ -2,8 +2,10 @@ import gradio as gr
 import requests
 import json
 import base64
-import io
+import boto3
 import os
+import datetime
+import time
 from constants import (
     max_security_scan_retries,
     css,
@@ -28,7 +30,9 @@ controller_url = ""
 models_list = {}
 embedding_models_list = {}
 scanners_list = {}
-l_mapping ={}
+l_mapping = {}
+feedback_bucket = ""
+feedback_prefix = ""
 
 class ConvState:
     def __init__(self):
@@ -785,11 +789,39 @@ def clear_fn():
         max_lines=sec_out_lines
     ), "", scan_empty_msg]
 
-def vote(data: gr.LikeData, conv):
+def vote(data: gr.LikeData, conv, model, language, temprature, top_p, top_k, request: gr.Request):
+    t = datetime.datetime.utcnow()
+    name = f"conv-{t.hour:02d}-{t.minute:02d}-{t.second:02d}.json"
+    prefix = f"{feedback_prefix}/{t.year}/{t.month:02d}/{t.day:02d}/{conv.conv_id}"
+    filename = os.path.join(prefix, name)
     if data.liked:
-        print("You upvoted this response: " + data.value + conv.conv_id)
+        vote_type = "upvote"
+        print("User upvoted this response: " + data.value)
     else:
-        print("You downvoted this response: " + data.value)   
+        vote_type = "downvote"
+        print("User downvoted this response: " + data.value)
+    data_json = {
+        "tstamp": round(time.time(), 4),
+        "type": vote_type,
+        "model": model,
+        "language": language,
+        "temprature": temprature,
+        "top_p": top_p,
+        "top_k": top_k,
+        "state": conv.dict(),
+        "ip": request.client.host,
+        "data": {
+            "index": data.index,
+            "value": data.value,
+        }
+    }
+    s3_client = boto3.client("s3")
+    s3_client.put_object(
+        Body=json.dumps(data_json), 
+        Bucket=feedback_bucket, 
+        Key=filename
+    )
+
 
 def add_text(message, history):
     if message != "":
@@ -970,7 +1002,7 @@ def web_ui():
         )
         chatbot.like(
             vote, 
-            state, 
+            [state, model, language, temprature, top_p, top_k], 
             None,
             show_progress=False,
             queue=False

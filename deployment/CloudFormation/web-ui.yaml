@@ -46,6 +46,10 @@ Parameters:
     Type: String
     # Update with the certificate ARN from Certificate Manager, which must exist in the same region.
     Default: 'arn:aws:acm:region:123456789012:certificate/00000000-0000-0000-0000-000000000000'
+  ProjectBucket:
+    Type: String
+  ProjectFeedbackPrefix:
+    Type: String
 Resources:
   AppTaskDef:
     Type: AWS::ECS::TaskDefinition
@@ -89,6 +93,10 @@ Resources:
             - !Ref ControllerPort
             - "--models-metadata-db"
             - !Ref ModelDBTableName
+            - "--feedback-bucket"
+            - !Ref ProjectBucket
+            - "--feedback-prefix"
+            - !Ref ProjectFeedbackPrefix
           Environment:
             - Name: AWS_DEFAULT_REGION
               Value: !Ref AWS::Region
