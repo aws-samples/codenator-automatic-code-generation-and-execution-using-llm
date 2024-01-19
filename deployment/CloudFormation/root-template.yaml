@@ -246,8 +246,8 @@ Resources:
         AppSG: !GetAtt VPCStack.Outputs.AppSecurityGroup
         LoadBalancerSecurityGroup: !GetAtt VPCStack.Outputs.LoadBalancerSecurityGroup
         ModelDBTableName: !Ref ModelDBTableName
-        ProjectBucket: !Ref ProjectBucket
-        ProjectFeedbackPrefix: !Ref ProjectFeedbackPrefix
+        # ProjectBucket: !Ref ProjectBucket
+        # ProjectFeedbackPrefix: !Ref ProjectFeedbackPrefix
         ALBPort: !Ref ALBPort
         ControllerDNS: !GetAtt ControllerService.Outputs.ALBDNSName
         ControllerPort: !Ref InternalAppPort
