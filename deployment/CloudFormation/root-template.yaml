@@ -254,7 +254,7 @@ Resources:
         ECSCluster: !Ref Cluster
         ExecutionRoleArn: !GetAtt IAMStack.Outputs.ECSExecutionRole
         TaskRoleArn: !GetAtt IAMStack.Outputs.WebUITaskRole
-        AppSG: !GetAtt VPCStack.Outputs.AppSecurityGroup
+        AppSG: !GetAtt VPCStack.Outputs.WebUISecurityGroup
         LoadBalancerSecurityGroup: !GetAtt VPCStack.Outputs.WebUILoadBalancerSecurityGroup
         ModelDBTableName: !Ref ModelDBTableName
         ProjectBucket: !Ref ProjectBucket

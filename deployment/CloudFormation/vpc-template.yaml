@@ -164,6 +164,26 @@ Resources:
       FromPort: !Ref AppPort
       ToPort: !Ref AppPort
       SourceSecurityGroupId: !Ref AppSG
+  WebUIAppSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Join ['', [!Ref ProjectName, AppSG]]
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref AppPort
+          ToPort: !Ref AppPort
+          SourceSecurityGroupId: !Ref WebUILoadBalancerSecurityGroup
+  WebUISGIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    DependsOn: 
+      - AppSG
+    Properties:
+      GroupId: !Ref AppSG
+      IpProtocol: tcp
+      FromPort: !Ref AppPort
+      ToPort: !Ref AppPort
+      SourceSecurityGroupId: !Ref AppSG
   LoadBalancerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -212,6 +232,8 @@ Outputs:
     Value: !Ref PrivateSubnetB
   AppSecurityGroup:
     Value: !Ref AppSG
+  WebUISecurityGroup:
+    Value: !Ref WebUIAppSG
   LoadBalancerSecurityGroup:
     Value: !Ref LoadBalancerSecurityGroup
   WebUILoadBalancerSecurityGroup:
