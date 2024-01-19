@@ -156,6 +156,19 @@ Resources:
         TaskRoleArn: !GetAtt IAMStack.Outputs.CodeScanTaskRole
         AppSG: !GetAtt VPCStack.Outputs.AppSecurityGroup
         LoadBalancerSecurityGroup: !GetAtt VPCStack.Outputs.LoadBalancerSecurityGroup
+  TaskStore:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectPrefix, 'aoss-store.yaml']]
+      Parameters:
+        ProjectName: !Ref ProjectName
+        VPC: !GetAtt VPCStack.Outputs.VpcID
+        PrivateSubnetA: !GetAtt VPCStack.Outputs.PrivateSubnetA
+        PrivateSubnetB: !GetAtt VPCStack.Outputs.PrivateSubnetB
+        AppName: task-store
+        TaskRoleArn: !GetAtt IAMStack.Outputs.TaskStoreTaskRole
+        StoreSG: !GetAtt VPCStack.Outputs.VPCESecurityGroup
+
 Outputs:
   APILayerDNSName:
     Value: !GetAtt APILayerService.Outputs.ALBDNSName

@@ -107,7 +107,7 @@ if __name__ == "__main__":
     parser.add_argument("--aoss-index", type=str, default="task-store-index")
     args = parser.parse_args()
     os.environ["CW_NAMESPACE"] = args.namespace
-    os.environ["AOSS_ENDPOINT"] = args.aoss_endpoint
+    os.environ["AOSS_ENDPOINT"] = args.aoss_endpoint.strip("https://")
     os.environ["AOSS_INDEX"] = args.aoss_index
     logger.info(f"args: {args}")
     uvicorn.run(

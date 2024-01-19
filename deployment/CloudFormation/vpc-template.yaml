@@ -171,7 +171,16 @@ Resources:
           FromPort: !Ref AppPort
           ToPort: !Ref AppPort
           CidrIp: 0.0.0.0/0
-
+  VPCESecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Join ['', [!Ref ProjectName, VPCESecurityGroup]]
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref AppSG
 
 Outputs:
   VpcID:
@@ -188,3 +197,5 @@ Outputs:
     Value: !Ref AppSG
   LoadBalancerSecurityGroup:
     Value: !Ref LoadBalancerSecurityGroup
+  VPCESecurityGroup:
+    Value: !Ref VPCESecurityGroup

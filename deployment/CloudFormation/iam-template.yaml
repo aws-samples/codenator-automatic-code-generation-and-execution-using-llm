@@ -128,7 +128,7 @@ Resources:
               - 
                 Effect: "Allow"
                 Action:
-                  - "aoss:*"
+                  - "aoss:APIAccessAll"
                   - "cloudwatch:PutMetricData"
                 Resource: "*"
 Outputs:

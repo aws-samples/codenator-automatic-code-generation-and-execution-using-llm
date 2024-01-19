@@ -20,7 +20,7 @@ Resources:
   VpcEndpoint:
    Type: 'AWS::OpenSearchServerless::VpcEndpoint'
    Properties:
-    Name: aoss-vpcendpoint
+    Name: !Join ['', [!Ref ProjectName, -aoss-vpcendpoint]]
     VpcId: !Ref VPC
     SubnetIds:
      - !Ref PrivateSubnetA
@@ -30,7 +30,7 @@ Resources:
   DataAccessPolicy:
     Type: 'AWS::OpenSearchServerless::AccessPolicy'
     Properties:
-      Name: task-store-access-policy
+      Name: !Join ['', [!Ref ProjectName, -task-store-access-policy]]
       Type: data
       Description: Access policy for task-store collection
       Policy: !Sub >-
@@ -40,7 +40,7 @@ Resources:
   NetworkPolicy:
     Type: 'AWS::OpenSearchServerless::SecurityPolicy'
     Properties:
-      Name: quickstart-network-policy
+      Name: !Join ['', [!Ref ProjectName, -task-store-network-policy]]
       Type: network
       Description: Network policy for task-store collection
       Policy: !Sub >-
@@ -48,7 +48,7 @@ Resources:
   EncryptionPolicy:
     Type: 'AWS::OpenSearchServerless::SecurityPolicy'
     Properties:
-      Name: task-store-security-policy
+      Name: !Join ['', [!Ref ProjectName, -task-store-security-policy]]
       Type: encryption
       Description: Encryption policy for task-store collection
       Policy: >-
@@ -62,4 +62,4 @@ Resources:
     DependsOn: EncryptionPolicy
 Outputs:
   CollectionARN:
-    Value: !GetAtt Collection.Arn
+    Value: !GetAtt Collection.CollectionEndpoint
