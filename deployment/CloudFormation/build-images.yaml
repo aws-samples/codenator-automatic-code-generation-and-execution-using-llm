@@ -77,7 +77,7 @@ Resources:
   CodeExecImage:
     Type: 'AWS::CloudFormation::Stack'
     Properties:
-      TemplateURL: !Ref ImageBuildTemplate
+      TemplateURL: !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectCFNPrefix, 'single-image-build.yaml']]
       Parameters:
         ProjectName: !Ref ProjectName
         ECRRepoName: 'code_executor'
@@ -86,7 +86,7 @@ Resources:
   CodeScanImage:
     Type: 'AWS::CloudFormation::Stack'
     Properties:
-      TemplateURL: !Ref ImageBuildTemplate
+      TemplateURL: !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectCFNPrefix, 'single-image-build.yaml']]
       Parameters:
         ProjectName: !Ref ProjectName
         ECRRepoName: 'code_scanner'
@@ -95,7 +95,7 @@ Resources:
   ControllerImage:
     Type: 'AWS::CloudFormation::Stack'
     Properties:
-      TemplateURL: !Ref ImageBuildTemplate
+      TemplateURL: !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectCFNPrefix, 'single-image-build.yaml']]
       Parameters:
         ProjectName: !Ref ProjectName
         ECRRepoName: 'controller'
@@ -104,7 +104,7 @@ Resources:
   TaskStoreImage:
     Type: 'AWS::CloudFormation::Stack'
     Properties:
-      TemplateURL: !Ref ImageBuildTemplate
+      TemplateURL: !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectCFNPrefix, 'single-image-build.yaml']]
       Parameters:
         ProjectName: !Ref ProjectName
         ECRRepoName: 'task_store'
@@ -113,7 +113,7 @@ Resources:
   WebUiImage:
     Type: 'AWS::CloudFormation::Stack'
     Properties:
-      TemplateURL: !Ref ImageBuildTemplate
+      TemplateURL: !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectCFNPrefix, 'single-image-build.yaml']]
       Parameters:
         ProjectName: !Ref ProjectName
         ECRRepoName: 'web_ui'
