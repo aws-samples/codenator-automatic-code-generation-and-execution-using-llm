@@ -205,7 +205,7 @@ Resources:
         AppPort: !Ref InternalAppPort
         ECSCluster: !Ref Cluster
         ExecutionRoleArn: !GetAtt IAMStack.Outputs.ECSExecutionRole
-        TaskRoleArn: !GetAtt IAMStack.Outputs.CodeScanTaskRole
+        TaskRoleArn: !GetAtt IAMStack.Outputs.TaskStoreTaskRole
         AppSG: !GetAtt VPCStack.Outputs.AppSecurityGroup
         LoadBalancerSecurityGroup: !GetAtt VPCStack.Outputs.LoadBalancerSecurityGroup
         StoreEndpoint: !GetAtt TaskStore.Outputs.StoreEndpoint
