@@ -808,7 +808,9 @@ def vote(data: gr.LikeData, conv, model, language, temprature, top_p, top_k, req
         "temprature": temprature,
         "top_p": top_p,
         "top_k": top_k,
-        "state": json.dumps(conv),
+        "conv_id": conv.conv_id,
+        "task": conv.task,
+        "plan": conv.plan,
         "ip": request.client.host,
         "data": {
             "index": data.index,
