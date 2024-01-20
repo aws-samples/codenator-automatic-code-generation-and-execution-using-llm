@@ -2,7 +2,7 @@
 
 set -x
 
-S3_BUCKET=${1:-"codenator-dev-00"}
+S3_BUCKET=${1}
 S3_PREFIX=${2:-"codenator/CFN"}
 
 echo "Uploading data..."

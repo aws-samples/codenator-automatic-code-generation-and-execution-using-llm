@@ -16,7 +16,6 @@ Parameters:
     Type: String
   ImageBuildTemplate:
     Type: String
-    Default: https://codenator-dev-00.s3.us-west-2.amazonaws.com/codenator/CFN/single-image-build.yaml
 Resources:
   CodeBuildPushDockerRole:
     Type: AWS::IAM::Role
