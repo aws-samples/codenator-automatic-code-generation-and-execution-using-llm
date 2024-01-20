@@ -14,8 +14,15 @@ Parameters:
     Default: codenator
   SourceRepo:
     Type: String
-  ImageBuildTemplate:
+    Description: Project git repo url
+  ProjectBucket:
     Type: String
+    Default: my-codenator-bucket
+    Description: Project bucket
+  ProjectCFNPrefix:
+    Type: String
+    Default: codenator/CFN/
+    Description: Prefix to the project's CloudFormation templates
 Resources:
   CodeBuildPushDockerRole:
     Type: AWS::IAM::Role
@@ -61,7 +68,7 @@ Resources:
   APILayerImage:
     Type: 'AWS::CloudFormation::Stack'
     Properties:
-      TemplateURL: !Ref ImageBuildTemplate
+      TemplateURL: !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectCFNPrefix, 'single-image-build.yaml']]
       Parameters:
         ProjectName: !Ref ProjectName
         ECRRepoName: 'api_layer'
