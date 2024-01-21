@@ -792,7 +792,7 @@ def clear_fn():
 def vote(data: gr.LikeData, conv, model, language, temprature, top_p, top_k, request: gr.Request):
     t = datetime.datetime.utcnow()
     name = f"conv-{t.hour:02d}-{t.minute:02d}-{t.second:02d}.json"
-    prefix = f"{feedback_prefix}/{t.year}/{t.month:02d}/{t.day:02d}/{conv.conv_id}"
+    prefix = os.path.join(feedback_prefix,f"{t.year}",f"{t.month:02d}",f"{t.day:02d}",f"{conv.conv_id}")
     filename = os.path.join(prefix, name)
     if data.liked:
         vote_type = "upvote"
