@@ -804,6 +804,8 @@ def vote(data: gr.LikeData, conv, model, language, temprature, top_p, top_k, req
         "tstamp": round(time.time(), 4),
         "type": vote_type,
         "model": model,
+        "model_family": models_list[model]["model_family"],
+        "model_name": models_list[model]["model_name"],
         "language": language,
         "temprature": temprature,
         "top_p": top_p,
