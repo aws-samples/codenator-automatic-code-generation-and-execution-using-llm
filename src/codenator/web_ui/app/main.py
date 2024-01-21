@@ -42,7 +42,7 @@ if __name__ == "__main__":
     webui.controller_url = f"{args.controller_host}:{args.controller_port}"
     webui.languages = get_languages_list(webui.controller_url)
     webui.feedback_bucket = args.feedback_bucket
-    webui.feedback_bucket = args.feedback_prefix
+    webui.feedback_prefix = args.feedback_prefix
     UI = web_ui()
     UI.queue(
         status_update_rate=10,
