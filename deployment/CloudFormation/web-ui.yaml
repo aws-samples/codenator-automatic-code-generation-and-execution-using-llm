@@ -198,6 +198,28 @@ Resources:
       Subnets:
         - !Ref PublicSubnetA
         - !Ref PublicSubnetB
+    HTTPSListernerRule:
+      Type: AWS::ElasticLoadBalancingV2::ListenerRule
+      Properties:
+        ListenerArn: !Ref ListenerHTTPS
+        Priority: 1
+        Conditions:
+          - Field: path-pattern
+            Values:
+              - /*
+        Actions:
+          - Type: authenticate-cognito
+            Order: 1
+            AuthenticationConfig: 
+              UserpoolArn: !ImportValue AuthLayerCognitoUserpoolArn
+              UserpoolClientId: !ImportValue AuthLayerCognitoUserpoolClientId
+              UserpoolDomain: !ImportValue AuthLayerCognitoUserpoolDomain
+              SessionCookieName: AWSELBAuthSessionCookie
+              OnUnauthenticatedRequest: authenticate              
+          - Type: forward
+            Order: 2
+            TargetGroupArn: !Ref TargetGroup
+
   LogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
@@ -205,3 +227,6 @@ Resources:
 Outputs:
   ALBDNSName: 
     Value: !GetAtt LoadBalancer.DNSName
+    Description: DNS of the web-ui ALB
+    Export:
+      Name: WebUiALBDNSName
