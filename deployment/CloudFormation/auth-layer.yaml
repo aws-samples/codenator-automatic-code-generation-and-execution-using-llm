@@ -1,0 +1,109 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Deploying Cognito Userpool for Authentication
+Parameters:
+  ProjectName:
+    AllowedPattern: '[A-Za-z0-9-]{1,16}'
+    ConstraintDescription: >-
+      Maximum of 22 alphanumeric characters. Can include hyphens (-), but not
+      spaces. Must be unique within your account in an AWS Region.
+    Description: Project Name used to identify your resources
+    MaxLength: '16'
+    MinLength: '1'
+    Type: String
+    Default: codenator
+  PublicDomainName:
+    Type: String
+    Description: Public domain name of the application, e.g. 'example.com'
+  CognitoUserEmail:
+    Type: String
+    Description: Email address of the Initial Cognito user
+Resources:
+  AuthLayerCognitoUserpool: 
+    Type: AWS::Cognito::UserPool
+    Properties: 
+      UserPoolName: !Join ['', [!Ref ProjectName, '_', cognito-userpool]]
+      AdminCreateUserConfig: 
+        AllowAdminCreateUserOnly: true
+      Policies: 
+        PasswordPolicy: 
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+          RequireUppercase: true
+      AutoVerifiedAttributes: 
+        - "email"
+      Schema: 
+        - Name: "email"
+          AttributeDataType: "String"
+          Mutable: true
+          Required: true
+      UsernameAttributes: 
+        - "email"
+      UsernameConfiguration: 
+        CaseSensitive: false
+      MfaConfiguration: "OFF"
+      EmailVerificationMessage: "Your verification code is {####}."
+      EmailVerificationSubject: "Your verification code"
+
+  UserpoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Join ['', [!Ref ProjectName, '-auth-domain']]
+      UserPoolId: !Ref AuthLayerCognitoUserpool
+  
+  UserpoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Join ['', [!Ref ProjectName, '-auth-client']]
+      RefreshTokenValidity: 30
+      IdTokenValidity: 30
+      AccessTokenValidity: 30
+      TokenValidityUnits: 
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthScopes:
+        - email
+        - openid
+        - profile
+        - aws.cognito.signin.user.admin
+      CallbackURLs:
+        - !Sub https://${PublicDomainName}/oauth2/idpresponse
+      SupportedIdentityProviders:
+        - COGNITO
+      GenerateSecret: true
+      UserPoolId: !Ref AuthLayerCognitoUserpool
+
+  UserPoolUser:
+    Type: 'AWS::Cognito::UserPoolUser'
+    Properties:
+      UserPoolId: !Ref AuthLayerCognitoUserpool
+      Username: !Ref CognitoUserEmail
+      DesiredDeliveryMediums:
+        - EMAIL
+      UserAttributes:
+        - Name: email
+          Value: !Ref CognitoUserEmail
+        - Name: email_verified
+          Value: "true"
+
+Outputs:
+  AuthLayerCognitoUserpoolArn:
+    Description: The ARN of the created Cognito User Pool
+    Value: !GetAtt AuthLayerCognitoUserpool.Arn
+    Export:
+      Name: AuthLayerCognitoUserpoolArn
+  AuthLayerCognitoUserpoolClientId:
+    Description: The Client Id of the created Cognito User Pool
+    Value: !Ref UserpoolClient
+    Export:
+      Name: AuthLayerCognitoUserpoolClientId
+  AuthLayerCognitoUserpoolDomain:
+    Description: The Domain of the created Cognito User Pool
+    Value: !Ref UserpoolDomain
+    Export:
+      Name: AuthLayerCognitoUserpoolDomain
