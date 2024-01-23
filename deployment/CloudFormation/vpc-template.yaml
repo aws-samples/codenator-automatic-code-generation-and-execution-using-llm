@@ -27,6 +27,9 @@ Parameters:
   PrivateSubnetCIDRB:
     Type: String
     Default: 10.2.3.0/24
+  AppSourceIP:
+    Type: String
+    Deafult: 0.0.0.0/0
   AppPort:
     Type: String
     Default: 8080
@@ -193,11 +196,11 @@ Resources:
         - IpProtocol: tcp
           FromPort: !Ref ALBPort
           ToPort: !Ref ALBPort
-          CidrIp: 0.0.0.0/0
+          CidrIp: !Ref AppSourceIP
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
-          CidrIp: 0.0.0.0/0
+          CidrIp: !Ref AppSourceIP
   VPCESecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:

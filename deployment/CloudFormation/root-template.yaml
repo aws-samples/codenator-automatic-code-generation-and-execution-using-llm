@@ -36,6 +36,10 @@ Parameters:
     Type: Number
     Default: 443
     Description: Application internet facing communication port
+  ALBSourceIP:
+    Type: String 
+    Description: Source IP or CIDR range that can access the application. Restrict to your machine public IP for better security.
+    Deafult: 0.0.0.0/0
   ProjectBucket:
     Type: String
     Default: my-codenator-bucket
@@ -79,6 +83,7 @@ Resources:
         PrivateSubnetCIDRB: !Ref PrivateSubnetCIDRB
         AppPort: !Ref InternalAppPort
         ALBPort: !Ref ALBPort
+        AppSourceIP: !Ref ALBSourceIP
   IAMStack:
     Type: 'AWS::CloudFormation::Stack'
     Properties:
