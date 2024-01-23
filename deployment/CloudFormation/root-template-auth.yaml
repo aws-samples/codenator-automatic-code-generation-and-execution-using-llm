@@ -283,6 +283,7 @@ Resources:
         ControllerDNS: !GetAtt ControllerService.Outputs.ALBDNSName
         ControllerPort: !Ref InternalAppPort
         Certificate: !Ref Certificate
+        PublicDomainName: !Ref PublicDomainName
 
 Outputs:
   APILayerDNSName:
