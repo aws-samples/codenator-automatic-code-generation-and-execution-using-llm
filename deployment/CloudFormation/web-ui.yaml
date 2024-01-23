@@ -198,28 +198,39 @@ Resources:
       Subnets:
         - !Ref PublicSubnetA
         - !Ref PublicSubnetB
-    HTTPSListernerRule:
-      Type: AWS::ElasticLoadBalancingV2::ListenerRule
-      Properties:
-        ListenerArn: !Ref ListenerHTTPS
-        Priority: 1
-        Conditions:
-          - Field: path-pattern
-            Values:
-              - /*
-        Actions:
-          - Type: authenticate-cognito
-            Order: 1
-            AuthenticationConfig: 
-              UserpoolArn: !ImportValue AuthLayerCognitoUserpoolArn
-              UserpoolClientId: !ImportValue AuthLayerCognitoUserpoolClientId
-              UserpoolDomain: !ImportValue AuthLayerCognitoUserpoolDomain
-              SessionCookieName: AWSELBAuthSessionCookie
-              OnUnauthenticatedRequest: authenticate              
-          - Type: forward
-            Order: 2
-            TargetGroupArn: !Ref TargetGroup
-
+  HTTPSListernerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref ListenerHTTPS
+      Priority: 1
+      Conditions:
+        - Field: path-pattern
+          Values:
+            - /*
+      Actions:
+        - Type: authenticate-cognito
+          Order: 1
+          AuthenticateCognitoConfig: 
+            UserpoolArn: !ImportValue AuthLayerCognitoUserpoolArn
+            UserpoolClientId: !ImportValue AuthLayerCognitoUserpoolClientId
+            UserpoolDomain: !ImportValue AuthLayerCognitoUserpoolDomain
+            SessionCookieName: AWSELBAuthSessionCookie
+            OnUnauthenticatedRequest: authenticate              
+        - Type: forward
+          Order: 2
+          TargetGroupArn: !Ref TargetGroup
+  HTTPListernerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref ListenerHTTP
+      Priority: 2
+      Conditions:
+        - Field: path-pattern
+          Values:
+            - /*
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
   LogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
