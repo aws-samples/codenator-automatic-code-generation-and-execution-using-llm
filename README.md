@@ -25,6 +25,33 @@ Below is an overview description of each component. To dive deep into each one, 
 * [Code scanner (Security Check/Guradrail)](src/codenator/code_scanner/README.md): Performs static code scanning to detect any vulnerabilities in generated code. Currently supports *Amazon CodeGuru* and *SemGrep* scanners.
 * feedback: User feedback hosted on S3.
 * logging: Conversation logging to S3.
+## Installation Guide
+1. Clone this [repository](https://github.com/aws-samples/codenator-automatic-code-generation-and-execution-using-llm/tree/main) on your local device or any ML platform like SageMaker Studio Classic.
+2. After cloning and unziping the repository, go to the deployment folder:
+	`cd codenator-automatic-code-generation-and-execution-using-llm-main/deployment/`
+3. Inside the **deployment** folder, run the `upload-templates.sh` script to upload the required CloudFormation templates to your specified S3 bucket in your current region, replacing **<BUCKET_NAME>** with your actual bucket name:
+      ```
+      ./upload-templates.sh <BUCKET_NAME>
+      ```
+5. After uploading the templates, create a certificate in the ACM (AWS Certificate Manager) console. 
+6. Then, navigate to the CodeBuild console and creating a build project. Provide a proper name for the `Project name` field, as this will be referenced later when launching CloudFormation stacks.
+7. Next, go to the CloudFormation console and create a new stack, specifying the object URL of the `build-images.yaml` template uploaded previously to your S3 bucket.
+	- When specifying the stack details for the CloudFormation stack you are creating from the `build-images.yaml` template, fill in the parameters as follows: 
+		- For `ProjectBucket`: Enter the name of the S3 bucket where you uploaded the CloudFormation templates earlier. This is the same bucket you passed to the `upload-templates.sh` script. 
+		- For `ProjectName`: Enter the name you gave to the CodeBuild project when creating it in the previous step. This links the build project to the stack. 
+		- For `SourceRepo`: Enter the GitHub repo URL where the sample application code is stored: 
+			```
+			https://github.com/aws-samples/codenator-automatic-code-generation-and-execution-using-llm.git
+			```
+8. After the CloudFormation stack finishes creating successfully with a status of CREATE_COMPLETE, go back to the CodeBuild console to check on the image build project. 
+	- Verify that the latest build status for the images shows as `Succeeded`. 
+	- This indicates that the Docker images defined in the buildspec were built properly from the application code linked in the stack.
+	- If the build status is anything other than `Succeeded`, check the build logs for errors and troubleshoot as needed.
+9. Next, create another stack with `root-template.yaml`.  Fill in the stack parameters as follows: 
+	- For `Certificate`: Enter the ARN of the certificate you created earlier in AWS Certificate Manager.
+	- For `CognitoUserEmail`: Provide an email address that will receive the temporary password for the Cognito user pool.
+	- For `ProjectBucket`: Enter the name of the S3 bucket where you uploaded the templates. This should match what you specified for the previous stack.
+	- For `PublicDomainName`: The public domain name can be found in the AWS Certificate Manager console next to the ARN for the certificate you created earlier.
 ## Security
 
 See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
