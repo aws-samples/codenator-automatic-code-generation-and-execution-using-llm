@@ -65,6 +65,13 @@ Parameters:
     # Update with the certificate ARN from Certificate Manager, which must exist in the same region.
     Default: 'arn:aws:acm:region:123456789012:certificate/00000000-0000-0000-0000-000000000000'
     Description: SSL/TLS certificates ARN from Certificate Manager, which must exist in the same region.
+  PublicDomainName:
+    Type: String
+    Description: Public domain name of the application, e.g. 'example.com'
+  CognitoUserEmail:
+    Type: String
+    Description: Email address of the Initial Cognito user
+
 Resources:
   VPCStack:
     Type: 'AWS::CloudFormation::Stack'
@@ -238,7 +245,17 @@ Resources:
         TaskStorePort: !Ref InternalAppPort
         ConvBucket: !Ref ProjectBucket
         ConvPrefix: !Ref ProjectConvPrefix
+  AuthLayerStack:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectCFNPrefix, 'auth-layer.yaml']]
+      Parameters:
+        ProjectName: !Ref ProjectName
+        PublicDomainName: !Ref PublicDomainName
+        CognitoUserEmail: !Ref CognitoUserEmail         
   WebUIService:
+    DependsOn:
+      - AuthLayerStack
     Type: 'AWS::CloudFormation::Stack'
     Properties:
       TemplateURL: !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectCFNPrefix, 'web-ui.yaml']]
@@ -263,6 +280,7 @@ Resources:
         ControllerDNS: !GetAtt ControllerService.Outputs.ALBDNSName
         ControllerPort: !Ref InternalAppPort
         Certificate: !Ref Certificate
+
 Outputs:
   APILayerDNSName:
     Value: !GetAtt APILayerService.Outputs.ALBDNSName
