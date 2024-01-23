@@ -39,7 +39,7 @@ Parameters:
   ALBSourceIP:
     Type: String 
     Description: Source IP or CIDR range that can access the application. Restrict to your machine public IP for better security.
-    Deafult: 0.0.0.0/0
+    Default: 0.0.0.0/0
   ProjectBucket:
     Type: String
     Default: my-codenator-bucket
