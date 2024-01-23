@@ -36,6 +36,10 @@ Parameters:
     Type: Number
     Default: 443
     Description: Application internet facing communication port
+  ALBSourceIP:
+    Type: String 
+    Description: Source IP or CIDR range that can access the application. Restrict to your machine public IP for better security.
+    Default: 0.0.0.0/0
   ProjectBucket:
     Type: String
     Default: my-codenator-bucket
@@ -79,6 +83,7 @@ Resources:
         PrivateSubnetCIDRB: !Ref PrivateSubnetCIDRB
         AppPort: !Ref InternalAppPort
         ALBPort: !Ref ALBPort
+        AppSourceIP: !Ref ALBSourceIP
   IAMStack:
     Type: 'AWS::CloudFormation::Stack'
     Properties:
@@ -98,6 +103,7 @@ Resources:
       Parameters:
         DataBucket: !Ref ProjectBucket
         TableName: !Ref PromptStoreTableName
+        DataPrefix: !Join ['', [!Ref ProjectCFNPrefix, 'data/model_db.json']]
   ModelDBStack:
     Type: 'AWS::CloudFormation::Stack'
     Properties:
@@ -105,6 +111,7 @@ Resources:
       Parameters:
         DataBucket: !Ref ProjectBucket
         TableName: !Ref ModelDBTableName
+        DataPrefix: !Join ['', [!Ref ProjectCFNPrefix, 'data/prompt_store.json']]
   Cluster:
     Type: AWS::ECS::Cluster
     Properties:
