@@ -1,6 +1,6 @@
 # CFN Python installation file
 deployment/Cloudformation/root_cfn_deploy.py
 deployment/Cloudformation/root-template-original.yaml
-
+deployment/Cloudformation/test/
 # .gitignore
 .gitignore
