@@ -50,6 +50,8 @@ Parameters:
     Type: String
   ProjectFeedbackPrefix:
     Type: String
+  PublicDomainName:
+    Type: String
 Resources:
   AppTaskDef:
     Type: AWS::ECS::TaskDefinition
@@ -162,8 +164,14 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
       DefaultActions:
-        - TargetGroupArn: !Ref TargetGroup
-          Type: forward
+        - Type: redirect
+          RedirectConfig:
+            Protocol: HTTPS
+            Port: '443'
+            Host: !Ref PublicDomainName
+            Path: '/#{path}'
+            Query: '#{query}'
+            StatusCode: HTTP_301
       LoadBalancerArn: !Ref LoadBalancer
       Port: !Ref ALBPort
       Protocol: HTTPS
@@ -177,7 +185,7 @@ Resources:
           RedirectConfig:
             Protocol: "HTTPS"
             Port: !Ref ALBPort
-            Host: "#{host}"
+            Host: !Ref PublicDomainName
             Path: "/#{path}"
             Query: "#{query}"
             StatusCode: "HTTP_301"
@@ -218,18 +226,6 @@ Resources:
             OnUnauthenticatedRequest: authenticate              
         - Type: forward
           Order: 2
-          TargetGroupArn: !Ref TargetGroup
-  HTTPListernerRule:
-    Type: AWS::ElasticLoadBalancingV2::ListenerRule
-    Properties:
-      ListenerArn: !Ref ListenerHTTP
-      Priority: 2
-      Conditions:
-        - Field: path-pattern
-          Values:
-            - /*
-      Actions:
-        - Type: forward
           TargetGroupArn: !Ref TargetGroup
   LogGroup:
     Type: AWS::Logs::LogGroup
