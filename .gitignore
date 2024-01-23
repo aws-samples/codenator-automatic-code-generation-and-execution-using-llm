@@ -4,3 +4,5 @@ deployment/Cloudformation/root-template-original.yaml
 deployment/Cloudformation/test/
 # .gitignore
 .gitignore
+
+.DS_Store
