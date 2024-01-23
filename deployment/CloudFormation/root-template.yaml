@@ -103,6 +103,7 @@ Resources:
       Parameters:
         DataBucket: !Ref ProjectBucket
         TableName: !Ref PromptStoreTableName
+        DataPrefix: !Join ['', [!Ref ProjectCFNPrefix, 'data/model_db.json']]
   ModelDBStack:
     Type: 'AWS::CloudFormation::Stack'
     Properties:
@@ -110,6 +111,7 @@ Resources:
       Parameters:
         DataBucket: !Ref ProjectBucket
         TableName: !Ref ModelDBTableName
+        DataPrefix: !Join ['', [!Ref ProjectCFNPrefix, 'data/prompt_store.json']]
   Cluster:
     Type: AWS::ECS::Cluster
     Properties:
