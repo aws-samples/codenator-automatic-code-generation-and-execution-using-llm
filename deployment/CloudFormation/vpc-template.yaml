@@ -29,7 +29,7 @@ Parameters:
     Default: 10.2.3.0/24
   AppSourceIP:
     Type: String
-    Deafult: 0.0.0.0/0
+    Default: 0.0.0.0/0
   AppPort:
     Type: String
     Default: 8080
