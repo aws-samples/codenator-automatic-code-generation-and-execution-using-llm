@@ -105,6 +105,8 @@ Resources:
       Parameters:
         DataBucket: !Ref ProjectBucket
         TableName: !Ref PromptStoreTableName
+        DataPrefix: !Join ['', [!Ref ProjectCFNPrefix, 'data/prompt_store.json']]        
+
   ModelDBStack:
     Type: 'AWS::CloudFormation::Stack'
     Properties:
@@ -112,6 +114,7 @@ Resources:
       Parameters:
         DataBucket: !Ref ProjectBucket
         TableName: !Ref ModelDBTableName
+        DataPrefix: !Join ['', [!Ref ProjectCFNPrefix, 'data/model_db.json']]        
   Cluster:
     Type: AWS::ECS::Cluster
     Properties:
@@ -258,7 +261,7 @@ Resources:
       - AuthLayerStack
     Type: 'AWS::CloudFormation::Stack'
     Properties:
-      TemplateURL: !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectCFNPrefix, 'web-ui.yaml']]
+      TemplateURL: !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectCFNPrefix, 'web-ui-auth.yaml']]
       Parameters:
         ProjectName: !Ref ProjectName
         VPC: !GetAtt VPCStack.Outputs.VpcID

@@ -211,9 +211,9 @@ Resources:
         - Type: authenticate-cognito
           Order: 1
           AuthenticateCognitoConfig: 
-            UserpoolArn: !ImportValue AuthLayerCognitoUserpoolArn
-            UserpoolClientId: !ImportValue AuthLayerCognitoUserpoolClientId
-            UserpoolDomain: !ImportValue AuthLayerCognitoUserpoolDomain
+            UserPoolArn: !ImportValue AuthLayerCognitoUserpoolArn
+            UserPoolClientId: !ImportValue AuthLayerCognitoUserpoolClientId
+            UserPoolDomain: !ImportValue AuthLayerCognitoUserpoolDomain
             SessionCookieName: AWSELBAuthSessionCookie
             OnUnauthenticatedRequest: authenticate              
         - Type: forward
