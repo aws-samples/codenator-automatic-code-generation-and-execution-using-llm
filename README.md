@@ -28,15 +28,15 @@ Below is an overview description of each component. To dive deep into each one, 
 ## Security
 
 ## Authentication Layer
-You can optionally to include an authentication layer to your application, which will enforce all users to get authenticated by Cognito Userpool prior accessing your application. To use authentication, the following tempaltes will be used:
+You can optionally to include an authentication layer to your application, which will enforce all users to get authenticated by Cognito Userpool prior to accessing this application. To use authentication, the following tempaltes will be used:
 * [auth-layer.yaml](/deployment/CloudFormation/auth-layer.yaml): This template is used to create Cognito Userpool and App Client to authenticate users coming to Web-UI Application Load Balancer
+* [web-ui-auth.yaml](/deployment/CloudFormation/web-ui-auth.yaml): This tempalte is built on top of [web-ui.yaml](/deployment/CloudFormation/root-web-ui-auth.yaml) with following changes to enforce all unauthenticated requests to send to Cognito Userpool for authentication. 
+1. Add HTTPS Listener Rules to enforce unauthenticated requests to get authenticated by Cognito Userpool App Client.
+2. Updates default behaviour of HTTPS Listener to redirect all requests to get authenticated. 
 * [root-tempalte-auth.yaml](/deployment/CloudFormation/root-template-auth.yaml): This tempalte is built on top of [root-template](/deployment/CloudFormation/root-template.yaml) with following changes:
 1. Requires `PublicDomainName` and `Certificate` to integrate Cognito Userpool to Web-UI Application Load Balancer
 2. Adds a new nested stack `AuthLayerStack` which 
 3. Adds dependency of `AuthLayerStack` to `WebUIService`
-* [web-ui-auth.yaml](/deployment/CloudFormation/web-ui-auth.yaml): This tempalte is built on top of [web-ui.yaml](/deployment/CloudFormation/root-web-ui-auth.yaml) with following changes:
-1. Add HTTPS Listener Rules to enforce unauthenticated requests to get authenticated by Cognito Userpool App Client.
-2. Updates default behaviour of HTTPS Listener to redirect all requests to get authenticated. 
 
 ## License
 
