@@ -1,0 +1,228 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  This template creates the IAM roles required to deploy Gen AI chat agent
+Parameters:
+  ProjectName:
+    AllowedPattern: '[A-Za-z0-9-]{1,16}'
+    ConstraintDescription: >-
+      Maximum of 22 alphanumeric characters. Can include hyphens (-), but not
+      spaces. Must be unique within your account in an AWS Region.
+    Description: Project Name used to identify your resources
+    MaxLength: '16'
+    MinLength: '1'
+    Type: String
+    Default: codenator
+  KMSKeyArn:
+    Type: String
+  ModelDBArn:
+    Type: String
+  PromptStoreArn:
+    Type: String
+  ProjectBucket:
+    Type: String
+  ProjectConvPrefix:
+    Type: String
+    Default: codenator/cov/
+  ProjectFeedbackPrefix:
+    Type: String
+    Default: codenator/feedback/
+Resources:
+  ECSExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['', [!Ref ProjectName, ECSExecutionRole]]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+  APILayerTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['', [!Ref ProjectName, APILayerTaskRole]]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies: 
+        - 
+          PolicyName: "APILayerPermissions"
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - 
+                Effect: "Allow"
+                Action:
+                  - "sagemaker:InvokeEndpoint*"
+                  - "bedrock:InvokeModel*"
+                  - "cloudwatch:PutMetricData"
+                Resource: "*"
+              - 
+                Effect: "Allow"
+                Action:
+                  - "dynamodb:GetItem"
+                Resource: !Ref ModelDBArn
+                
+  CodeExecTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['', [!Ref ProjectName, CodeExecTaskRole]]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies: 
+        - 
+          PolicyName: "CodeExecPermissions"
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - 
+                Effect: "Allow"
+                Action:
+                  - "cloudwatch:PutMetricData"
+                Resource: "*"
+              - 
+                Effect: "Allow"
+                Action:
+                  - "kms:Decrypt"
+                Resource: !Ref KMSKeyArn
+  CodeScanTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['', [!Ref ProjectName, CodeScanTaskRole]]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies: 
+        - 
+          PolicyName: "CodeScanPermissions"
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - 
+                Effect: "Allow"
+                Action:
+                  - "codeguru-security:CreateScan"
+                  - "codeguru-security:CreateUploadUrl"
+                  - "codeguru-security:GetScan"
+                  - "codeguru-security:GetFindings"
+                  - "cloudwatch:PutMetricData"
+                Resource: "*"
+  TaskStoreTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['', [!Ref ProjectName, TaskStoreTaskRole]]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies: 
+        - 
+          PolicyName: "TaskStorePermissions"
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - 
+                Effect: "Allow"
+                Action:
+                  - "aoss:APIAccessAll"
+                  - "cloudwatch:PutMetricData"
+                Resource: "*"
+  ControllerTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['', [!Ref ProjectName, ControllerTaskRole]]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies: 
+        - 
+          PolicyName: "ControllerPermissions"
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - 
+                Effect: "Allow"
+                Action:
+                  - "cloudwatch:PutMetricData"
+                Resource: "*"
+              - 
+                Effect: "Allow"
+                Action:
+                  - "kms:Encrypt"
+                Resource: !Ref KMSKeyArn
+              -
+                Effect: "Allow"
+                Action:
+                  - "s3:PutObject"
+                  - "s3:GetObject"
+                Resource: !Join ['', ['arn:aws:s3:::', !Ref ProjectBucket, '/', !Ref ProjectConvPrefix, '*']]
+              -
+                Effect: "Allow"
+                Action:
+                  - "dynamodb:GetItem"
+                Resource:
+                  - !Ref ModelDBArn
+                  - !Ref PromptStoreArn
+  WebUITaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['', [!Ref ProjectName, WebUITaskRole]]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies: 
+        - 
+          PolicyName: "WebUIPermissions"
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - 
+                Effect: "Allow"
+                Action:
+                  - "cloudwatch:PutMetricData"
+                Resource: "*"
+              - 
+                Effect: "Allow"
+                Action:
+                  - "dynamodb:GetItem"
+                Resource: !Ref ModelDBArn
+              -
+                Effect: "Allow"
+                Action:
+                  - "s3:PutObject"
+                Resource: !Join ['', ['arn:aws:s3:::', !Ref ProjectBucket, '/', !Ref ProjectFeedbackPrefix, '*']]
+Outputs:
+  ECSExecutionRole:
+    Value: !GetAtt ECSExecutionRole.Arn
+  APILayerTaskRole:
+    Value: !GetAtt APILayerTaskRole.Arn
+  CodeExecTaskRole:
+    Value: !GetAtt CodeExecTaskRole.Arn
+  CodeScanTaskRole:
+    Value: !GetAtt CodeScanTaskRole.Arn
+  TaskStoreTaskRole:
+    Value: !GetAtt TaskStoreTaskRole.Arn
+  ControllerTaskRole:
+    Value: !GetAtt ControllerTaskRole.Arn
+  WebUITaskRole:
+    Value: !GetAtt WebUITaskRole.Arn

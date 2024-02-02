@@ -1,0 +1,219 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Deploying apps on Fargate.
+Parameters:
+  VPC:
+    Type: String
+  PrivateSubnetA:
+    Type: String
+  PrivateSubnetB:
+    Type: String
+  ProjectName:
+    Type: String
+  AppName:
+    Type: String
+    Default: controller
+  AppPort:
+    Type: Number
+    Default: 8080
+  HealthCheckPath:
+    Type: String
+    Default: /ping
+  ECSCluster:
+    Type: String
+  ExecutionRoleArn:
+    Type: String
+  TaskRoleArn:
+    Type: String
+  AppSG:
+    Type: String
+  LoadBalancerSecurityGroup:
+    Type: String
+  ModelDBTableName:
+    Type: String
+  PromptStoreTableName:
+    Type: String
+  KMSKey:
+    Type: String
+  APILayerDNS:
+    Type: String
+  APILayerPort:
+    Type: Number
+    Default: 8080
+  CodeExecDNS:
+    Type: String
+  CodeExecPort:
+    Type: Number
+    Default: 8080
+  CodeScanDNS:
+    Type: String
+  CodeScanPort:
+    Type: Number
+    Default: 8080
+  TaskStoreDNS:
+    Type: String
+  TaskStorePort:
+    Type: Number
+    Default: 8080
+  ConvBucket:
+    Type: String
+  ConvPrefix:
+    Type: String
+    Default: "codenator/cov/"
+Resources:
+  AppTaskDef:
+    Type: AWS::ECS::TaskDefinition
+    # Makes sure the log group is created before it is used.
+    DependsOn: LogGroup
+    Properties:
+      # Name of the task definition. Subsequent versions of the task definition are grouped together under this name.
+      Family: !Join ['', [!Ref ProjectName, '_', !Ref AppName, '_TaskDef']]
+      # awsvpc is required for Fargate
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      # 256 (.25 vCPU) - Available memory values: 0.5GB, 1GB, 2GB
+      # 512 (.5 vCPU) - Available memory values: 1GB, 2GB, 3GB, 4GB
+      # 1024 (1 vCPU) - Available memory values: 2GB, 3GB, 4GB, 5GB, 6GB, 7GB, 8GB
+      # 2048 (2 vCPU) - Available memory values: Between 4GB and 16GB in 1GB increments
+      # 4096 (4 vCPU) - Available memory values: Between 8GB and 30GB in 1GB increments
+      Cpu: 1024
+      # 0.5GB, 1GB, 2GB - Available cpu values: 256 (.25 vCPU)
+      # 1GB, 2GB, 3GB, 4GB - Available cpu values: 512 (.5 vCPU)
+      # 2GB, 3GB, 4GB, 5GB, 6GB, 7GB, 8GB - Available cpu values: 1024 (1 vCPU)
+      # Between 4GB and 16GB in 1GB increments - Available cpu values: 2048 (2 vCPU)
+      # Between 8GB and 30GB in 1GB increments - Available cpu values: 4096 (4 vCPU)
+      Memory: 8GB
+      # A role needed by ECS.
+      # "The ARN of the task execution role that containers in this task can assume. All containers in this task are granted the permissions that are specified in this role."
+      # "There is an optional task execution IAM role that you can specify with Fargate to allow your Fargate tasks to make API calls to Amazon ECR."
+      ExecutionRoleArn: !Ref ExecutionRoleArn
+      # "The Amazon Resource Name (ARN) of an AWS Identity and Access Management (IAM) role that grants containers in the task permission to call AWS APIs on your behalf."
+      TaskRoleArn: !Ref TaskRoleArn
+      ContainerDefinitions:
+        - Name: !Ref AppName
+          Command:
+            - "--host"
+            - "0.0.0.0"
+            - "--port"
+            - !Ref AppPort
+            - "--namespace"
+            - !Sub "${ProjectName}/${AppName}/"
+            - "--workers"
+            - "3"
+            - "--api-layer-host"
+            - !Ref APILayerDNS
+            - "--api-layer-port"
+            - !Ref APILayerPort
+            - "--code-executor-host"
+            - !Ref CodeExecDNS
+            - "--code-executor-port"
+            - !Ref CodeExecPort
+            - "--code-scanner-host"
+            - !Ref CodeScanDNS
+            - "--code-scanner-port"
+            - !Ref CodeScanPort
+            - "--task-store-host"
+            - !Ref TaskStoreDNS
+            - "--task-store-port"
+            - !Ref TaskStorePort
+            - "--conv-bucket"
+            - !Ref ConvBucket
+            - "--conv-prefix"
+            - !Ref ConvPrefix
+            - "--prompt-store-name"
+            - !Ref PromptStoreTableName
+            - "--models-metadata-db"
+            - !Ref ModelDBTableName
+            - "--kms"
+            - !Ref KMSKey
+          Environment:
+            - Name: AWS_DEFAULT_REGION
+              Value: !Ref AWS::Region
+            - Name: AWS_REGION
+              Value: !Ref AWS::Region
+            - Name: APP_LOG_LEVEL
+              Value: DEBUG
+          Image: !Join ['', [ !Ref AWS::AccountId, '.dkr.ecr.', !Ref AWS::Region, '.amazonaws.com/controller:latest']]
+          PortMappings:
+            - ContainerPort: !Ref AppPort
+          # Send logs to CloudWatch Logs
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-region: !Ref AWS::Region
+              awslogs-group: !Ref LogGroup
+              awslogs-stream-prefix: ecs
+  Service:
+    Type: AWS::ECS::Service
+    # This dependency is needed so that the load balancer is setup correctly in time
+    DependsOn:
+      - ListenerHTTP
+    Properties: 
+      ServiceName: !Join ['', [!Ref AppName, 'Service']]
+      Cluster: !Ref ECSCluster
+      TaskDefinition: !Ref AppTaskDef
+      DesiredCount: 1
+      # This may need to be adjusted if the container takes a while to start up
+      HealthCheckGracePeriodSeconds: 30
+      LaunchType: FARGATE
+      NetworkConfiguration: 
+        AwsvpcConfiguration:
+          # change to DISABLED if you're using private subnets that have access to a NAT gateway
+          AssignPublicIp: DISABLED
+          Subnets:
+            - !Ref PrivateSubnetA
+            - !Ref PrivateSubnetB
+          SecurityGroups:
+            - !Ref AppSG
+      LoadBalancers:
+        - ContainerName: !Ref AppName
+          ContainerPort: !Ref AppPort
+          TargetGroupArn: !Ref TargetGroup
+  
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      # will look for a 200 status code by default unless specified otherwise
+      HealthCheckPath: !Ref HealthCheckPath
+      HealthCheckTimeoutSeconds: 5
+      UnhealthyThresholdCount: 2
+      HealthyThresholdCount: 2
+      Name: !Join ['', [!Ref AppName, -TargetGroup]]
+      Port: !Ref AppPort
+      Protocol: HTTP
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 60 # default is 300
+      TargetType: ip
+      VpcId: !Ref VPC
+  ListenerHTTP:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - TargetGroupArn: !Ref TargetGroup
+          Type: forward
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: !Ref AppPort
+      Protocol: HTTP
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      LoadBalancerAttributes:
+        # this is the default, but is specified here in case it needs to be changed
+        - Key: idle_timeout.timeout_seconds
+          Value: 60
+      Name: !Join ['', [!Ref AppName, '-LoadBalancer']]
+      Scheme: internal
+      SecurityGroups:
+        - !Ref LoadBalancerSecurityGroup
+      Subnets:
+        - !Ref PrivateSubnetA
+        - !Ref PrivateSubnetB
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join ['', [/ecs/, !Ref ProjectName,/, !Ref AppName]]
+Outputs:
+  ALBDNSName: 
+    Value: !GetAtt LoadBalancer.DNSName

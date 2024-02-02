@@ -1,0 +1,39 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Parameters:
+  TableName:
+    Type: String
+    Default: "prompt-store"
+  DataBucket:
+    Type: String
+    Default: "codenator-dev-00"
+  DataPrefix:
+    Type: String
+    Default: "codenator/CFN/data/prompt_store.json"
+Resources:
+  DDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref TableName
+      BillingMode: PROVISIONED
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      AttributeDefinitions:
+        -
+          AttributeName: "template_id"
+          AttributeType: "S"
+      KeySchema:
+        -
+          AttributeName: "template_id"
+          KeyType: "HASH"
+      SSESpecification:
+        SSEEnabled: False
+      ImportSourceSpecification:
+        InputCompressionType: "NONE"
+        InputFormat: "DYNAMODB_JSON"
+        S3BucketSource:
+          S3Bucket: !Ref DataBucket
+          S3KeyPrefix: !Ref DataPrefix
+Outputs:
+  DDBTableArn:
+    Value: !GetAtt DDBTable.Arn

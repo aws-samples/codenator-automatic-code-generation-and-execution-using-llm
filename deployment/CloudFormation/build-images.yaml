@@ -1,0 +1,134 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  This template builds ECR images for Codenator
+Parameters:
+  ProjectName:
+    AllowedPattern: '[A-Za-z0-9-]{1,16}'
+    ConstraintDescription: >-
+      Maximum of 22 alphanumeric characters. Can include hyphens (-), but not
+      spaces. Must be unique within your account in an AWS Region.
+    Description: Project Name used to identify your resources
+    MaxLength: '16'
+    MinLength: '1'
+    Type: String
+    Default: codenator
+  SourceRepo:
+    Type: String
+    Description: Project git repo url
+  ProjectBucket:
+    Type: String
+    Default: my-codenator-bucket
+    Description: Project bucket
+  ProjectCFNPrefix:
+    Type: String
+    Default: codenator/CFN/
+    Description: Prefix to the project's CloudFormation templates
+Resources:
+  CodeBuildPushDockerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['', [!Ref ProjectName, CodeBuildPushDockerRole]]
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+                - codepipeline.amazonaws.com
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: !Join ['', [!Ref ProjectName, CodeBuildPushDockerPolicy]]
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreatelogStream
+                  - logs:PutLogEvents
+                  - ecr:GetAuthorizationToken
+                  - ecr:DescribeRepositories
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:CompleteLayerUpload
+                  - ecr:InitiateLayerUpload
+                  - ecr:PutImage
+                  - ecr:UploadLayerPart
+                  - ecr:BatchDeleteImage
+                  - ecr:ListImages
+                  - s3:*
+                  - codecommit:*
+                  - lambda:*
+                  - codebuild:*
+                  - ssm:DescribeParameters
+                  - ssm:DeleteParameters
+                Resource: "*"
+  APILayerImage:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectCFNPrefix, 'single-image-build.yaml']]
+      Parameters:
+        ProjectName: !Ref ProjectName
+        ECRRepoName: 'api_layer'
+        SourceRepo: !Ref SourceRepo
+        CodeBuildPushDockerRole: !GetAtt CodeBuildPushDockerRole.Arn
+  CodeExecImage:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectCFNPrefix, 'single-image-build.yaml']]
+      Parameters:
+        ProjectName: !Ref ProjectName
+        ECRRepoName: 'code_executor'
+        SourceRepo: !Ref SourceRepo
+        CodeBuildPushDockerRole: !GetAtt CodeBuildPushDockerRole.Arn
+  CodeScanImage:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectCFNPrefix, 'single-image-build.yaml']]
+      Parameters:
+        ProjectName: !Ref ProjectName
+        ECRRepoName: 'code_scanner'
+        SourceRepo: !Ref SourceRepo
+        CodeBuildPushDockerRole: !GetAtt CodeBuildPushDockerRole.Arn
+  ControllerImage:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectCFNPrefix, 'single-image-build.yaml']]
+      Parameters:
+        ProjectName: !Ref ProjectName
+        ECRRepoName: 'controller'
+        SourceRepo: !Ref SourceRepo
+        CodeBuildPushDockerRole: !GetAtt CodeBuildPushDockerRole.Arn
+  TaskStoreImage:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectCFNPrefix, 'single-image-build.yaml']]
+      Parameters:
+        ProjectName: !Ref ProjectName
+        ECRRepoName: 'task_store'
+        SourceRepo: !Ref SourceRepo
+        CodeBuildPushDockerRole: !GetAtt CodeBuildPushDockerRole.Arn
+  WebUiImage:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Join ['', ['https://', !Ref ProjectBucket, '.s3.', !Ref AWS::Region, '.amazonaws.com/', !Ref ProjectCFNPrefix, 'single-image-build.yaml']]
+      Parameters:
+        ProjectName: !Ref ProjectName
+        ECRRepoName: 'web_ui'
+        SourceRepo: !Ref SourceRepo
+        CodeBuildPushDockerRole: !GetAtt CodeBuildPushDockerRole.Arn
+Outputs:
+  APILayerImageUri:
+    Value: !GetAtt APILayerImage.Outputs.ImageUri
+  CodeExecImageUri:
+    Value: !GetAtt CodeExecImage.Outputs.ImageUri
+  CodeScanImageUri:
+    Value: !GetAtt CodeScanImage.Outputs.ImageUri
+  ControllerImageUri:
+    Value: !GetAtt ControllerImage.Outputs.ImageUri
+  TaskStoreImageUri:
+    Value: !GetAtt TaskStoreImage.Outputs.ImageUri
+  WebUIImageUri:
+    Value: !GetAtt WebUiImage.Outputs.ImageUri
